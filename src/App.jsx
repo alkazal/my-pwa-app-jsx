@@ -18,7 +18,7 @@ function App() {
       </div>
       <h1>Vite + React</h1>
       <div className="card">
-        <h3>Welcome Razi const [state, dispatch] = useReducer(first, second, third) to PWA!</h3>
+        <h3>Welcome Razi RND to PWA!</h3>
         <button onClick={() => setCount((count) => count + 1)}>
           Click to count and it is counting {count} 
         </button>
