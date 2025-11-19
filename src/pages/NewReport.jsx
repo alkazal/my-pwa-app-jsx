@@ -13,10 +13,9 @@ export default function NewReport() {
 
     const online = navigator.onLine;
 
-    //const { data: { user } } = await supabase.auth.getUser();
-    const { data } = await supabase.auth.getSession();
-    const user = data?.session?.user;
-
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    
     // --------------------------
     // OFFLINE MODE
     // --------------------------
@@ -27,7 +26,7 @@ export default function NewReport() {
         attachment,
         synced: false,
         created_at: new Date().toISOString(),
-        user_id: user?.id ?? null,
+        user_id: userId || null,
       });
 
       setStatus("Saved offline — will sync when online");
@@ -67,7 +66,7 @@ export default function NewReport() {
         report_type: reportType,
         description,
         attachment_url: attachmentUrl,
-        user_id: user.id
+        user_id: userId,
     });
 
     if (insertError) {

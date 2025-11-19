@@ -12,53 +12,55 @@ export default function MySubmissions() {
     loadData();
   }, []);
 
-  async function loadData() {
-    setLoading(true);
+ async function loadData() {
+  setLoading(true);
 
-    // ---- Get session (WORKS OFFLINE) ----
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+  // --- Get session from Supabase (works offline) ---
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
 
-    if (!userId) {
-      if (navigator.onLine) {
-        // online but no session
-        navigate("/login");
-        return;
-      }
+  // If offline and no user session stored → Dexie only
+  if (!navigator.onLine || !userId) {
+    console.log("Offline mode or no session → show Dexie only");
 
-      // OFFLINE with no supabase session -> load Dexie only
-      console.log("Offline mode: loading Dexie only");
-      const offlineData = await db.reports.toArray();
-      setItems(offlineData);
-      setLoading(false);
-      return;
-    }
+    const offlineData = await db.reports
+      .filter(r => r.user_id === userId || !userId)   // allow unsynced data
+      .toArray();
 
-    // ---- If online, load from Supabase ----
-    if (navigator.onLine) {
-      const { data, error } = await supabase
-        .from("reports")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error(error);
-      } else {
-        setItems(data);
-      }
-    } else {
-      // ---- Offline: Load from Dexie ----
-      const offlineData = await db.reports
-        .where("user_id")
-        .equals(userId)
-        .toArray();
-
-      setItems(offlineData);
-    }
-
+    setItems(offlineData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
     setLoading(false);
+    return;
   }
+
+  // ----- ONLINE MODE -----
+  // 1. Load from Supabase
+  const { data: onlineReports, error } = await supabase
+    .from("reports")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+  }
+
+  // 2. Load offline unsynced reports from Dexie
+  const offlineReports = await db.reports
+    .filter(r => r.synced === false || r.synced === undefined)
+    .toArray();
+
+  // 3. Merge them → always show both
+  const merged = [
+    ...offlineReports.map(r => ({ ...r, isOffline: true })), // mark as offline
+    ...onlineReports
+  ];
+
+  // 4. Sort newest first
+  merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  setItems(merged);
+  setLoading(false);
+}
 
   return (
     <div className="p-6">
@@ -86,6 +88,13 @@ export default function MySubmissions() {
             <p className="text-sm text-gray-600">
               {new Date(x.created_at).toLocaleString()}
             </p>
+
+            {x.isOffline && (
+              <span className="text-xs bg-yellow-300 text-black px-2 py-1 rounded">
+                Offline (Not Synced)
+              </span>
+            )}
+
           </div>
         ))}
       </div>
