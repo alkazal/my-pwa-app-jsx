@@ -1,16 +1,22 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { useEffect } from "react";
+
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 import Home from "./pages/Home";
 import NewReport from "./pages/NewReport";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
 import MySubmissions from "./pages/MySubmissions";
-import PrivateRoute from "./components/PrivateRoute";
-import TestSession from "./TestSession";
-import SyncStatus from "./components/SyncStatus";
 
+// import PrivateRoute from "./components/PrivateRoute";
+
+import SyncStatus from "./components/SyncStatus";
 import { syncReports } from "./lib/sync";
+
+import Navigation from "./components/Navigation";
 
 export default function App() {
 
@@ -33,38 +39,51 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <nav style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>
-        <Link to="/" style={{ marginRight: "10px" }}>Home</Link>
-        <Link to="/my-submissions" style={{ marginRight: "10px" }}>My Reports</Link>
-        <Link to="/new">New Report</Link>
-      </nav>
+      <Navigation />
 
-      <Routes>
+      <div className="pb-20 md:pb-0"> 
+
+        <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/" element={<Home />} />
-
-        <Route path="/test" element={<TestSession />} />
+        {/* <Route path="/" element={<Home />} /> */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        {/* <Route path="/test" element={<TestSession />} /> */}
 
         {/* Protected routes */}
         <Route
-          path="/new"
+          path="/"
           element={
-            <PrivateRoute>
-              <NewReport />
-            </PrivateRoute>
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
           }
         />
         <Route
-          path="/my-submissions"
+          path="/new-report"
           element={
-            <PrivateRoute>
-              <MySubmissions />
-            </PrivateRoute>
+            <ProtectedRoute>
+              <NewReport />
+            </ProtectedRoute>
+            // <PrivateRoute>
+            //   <NewReport />
+            // </PrivateRoute>
           }
         />
-      </Routes>
+        <Route
+          path="/submissions"
+          element={
+            <ProtectedRoute>
+              <MySubmissions />
+            </ProtectedRoute>
+          }
+        />
+        </Routes>
+        
+      </div>
+      
       <SyncStatus />
     </BrowserRouter>
   );
