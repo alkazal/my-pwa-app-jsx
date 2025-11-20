@@ -2,9 +2,15 @@ import { supabase } from "./supabase";
 import { db } from "../db";
 
 // UI status listener
-export let onStatusChange = () => {};
+let onStatusChange = () => {};
 export function setSyncStatusListener(fn) {
   onStatusChange = fn;
+}
+
+// Individual report synced listener (for toasts)
+let onReportSynced = () => {};
+export function setReportSyncedListener(fn) {
+  onReportSynced = fn;
 }
 
 export async function syncReports() {
@@ -19,8 +25,12 @@ export async function syncReports() {
       return;
     }
 
-    // Get all unsynced reports
-    const unsynced = await db.reports.filter(r => !r.synced).toArray();
+    // Get unsynced reports for this user
+    const unsynced = await db.reports
+      .where("synced")
+      .equals(false)
+      .and(r => r.user_id === user.id)
+      .toArray();
 
     if (unsynced.length === 0) {
       onStatusChange("done");
@@ -33,9 +43,11 @@ export async function syncReports() {
 
         // Upload attachment if exists
         if (report.attachment && !report.attachment_url) {
-          const filename = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+          const filename = `${user.id}/${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}-${report.attachment.name}`;
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from("attachments")
             .upload(filename, report.attachment);
 
@@ -52,27 +64,32 @@ export async function syncReports() {
         }
 
         // Insert into Supabase
-        const { data, error: insertError } = await supabase.from("reports").insert({
-          report_type: report.report_type,
-          description: report.description,
-          attachment_url: attachmentUrl,
-          user_id: user.id,
-          created_at: report.created_at
-        }).select().single();
+        const { data, error: insertError } = await supabase
+          .from("reports")
+          .insert({
+            report_type: report.report_type,
+            description: report.description,
+            attachment_url: attachmentUrl,
+            user_id: user.id,
+            created_at: report.created_at,
+          })
+          .select()
+          .single();
 
         if (insertError) {
           console.error("Insert failed for report", report.id, insertError);
           continue;
         }
 
-        // Mark Dexie row as synced
+        // Update Dexie row
         await db.reports.update(report.id, {
           synced: true,
           attachment_url: attachmentUrl,
-          supabase_id: data.id
+          supabase_id: data.id,
         });
 
         console.log(`Report ${report.id} synced ✅`);
+        onReportSynced(report.description || "Report");
 
       } catch (err) {
         console.error("Sync error for report", report.id, err);

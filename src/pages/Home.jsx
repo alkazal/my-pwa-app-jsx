@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { db } from "../db";
 import { useNavigate } from "react-router-dom";
 import Toast from "../components/Toast";
-import { syncReports, setSyncStatusListener } from "../lib/sync";
+import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 
 import {
   BarChart,
@@ -15,34 +15,15 @@ import {
   Legend,
 } from "recharts";
 
-const [toastMessage, setToastMessage] = useState("");
-
-// Listen for each synced report
-useEffect(() => {
-  // Listen to individual report syncs
-  setReportSyncedListener((reportDesc) => {
-    setToastMessage(`Report synced: ${reportDesc}`);
-  });
-
-  // Existing sync status listener
-  setSyncStatusListener((status) => {
-    setSyncStatus(status);
-    if (status === "done") loadReports();
-  });
-
-  const handleOnline = () => syncReports();
-  window.addEventListener("online", handleOnline);
-
-  return () => window.removeEventListener("online", handleOnline);
-}, []);
-
 export default function Home() {
   const [user, setUser] = useState(null);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | done
+  const [toastMessage, setToastMessage] = useState("");
   const navigate = useNavigate();
 
+  // Load reports
   const loadReports = async () => {
     setLoading(true);
 
@@ -76,19 +57,23 @@ export default function Home() {
     setLoading(false);
   };
 
+  // Hooks inside component
   useEffect(() => {
     loadReports();
 
-    // Listen to sync events
+    // Listen to sync status changes
     setSyncStatusListener((status) => {
       setSyncStatus(status);
       if (status === "done") loadReports();
     });
 
+    // Listen to individual report syncs for toast
+    setReportSyncedListener((reportDesc) => {
+      setToastMessage(`Report synced: ${reportDesc}`);
+    });
+
     // Auto-sync when back online
-    const handleOnline = () => {
-      syncReports();
-    };
+    const handleOnline = () => syncReports();
     window.addEventListener("online", handleOnline);
 
     return () => {
@@ -192,6 +177,5 @@ export default function Home() {
         onClose={() => setToastMessage("")}
       />
     </div>
-    
   );
 }
