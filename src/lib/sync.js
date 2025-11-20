@@ -42,51 +42,51 @@ export async function syncReports() {
         let attachmentUrl = report.attachment_url || null;
 
         // Upload attachment if exists
-        if (report.attachment && !report.attachment_url) {
-          const filename = `${user.id}/${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2)}-${report.attachment.name}`;
+        // if (report.attachment && !report.attachment_url) {
+        //   const filename = `${user.id}/${Date.now()}-${Math.random()
+        //     .toString(36)
+        //     .slice(2)}-${report.attachment.name}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("attachments")
-            .upload(filename, report.attachment);
+        //   const { error: uploadError } = await supabase.storage
+        //     .from("attachments")
+        //     .upload(filename, report.attachment);
 
-          if (uploadError) {
-            console.error("Upload failed for report", report.id, uploadError);
-            continue;
-          }
+        //   if (uploadError) {
+        //     console.error("Upload failed for report", report.id, uploadError);
+        //     continue;
+        //   }
 
-          const { data: publicData } = supabase.storage
-            .from("attachments")
-            .getPublicUrl(filename);
+        //   const { data: publicData } = supabase.storage
+        //     .from("attachments")
+        //     .getPublicUrl(filename);
 
-          attachmentUrl = publicData?.publicUrl || null;
-        }
+        //   attachmentUrl = publicData?.publicUrl || null;
+        // }
 
-        // Insert into Supabase
-        const { data, error: insertError } = await supabase
-          .from("reports")
-          .insert({
-            report_type: report.report_type,
-            description: report.description,
-            attachment_url: attachmentUrl,
-            user_id: user.id,
-            created_at: report.created_at,
-          })
-          .select()
-          .single();
+        // // Insert into Supabase
+        // const { data, error: insertError } = await supabase
+        //   .from("reports")
+        //   .insert({
+        //     report_type: report.report_type,
+        //     description: report.description,
+        //     attachment_url: attachmentUrl,
+        //     user_id: user.id,
+        //     created_at: report.created_at,
+        //   })
+        //   .select()
+        //   .single();
 
-        if (insertError) {
-          console.error("Insert failed for report", report.id, insertError);
-          continue;
-        }
+        // if (insertError) {
+        //   console.error("Insert failed for report", report.id, insertError);
+        //   continue;
+        // }
 
-        // Update Dexie row
-        await db.reports.update(report.id, {
-          synced: true,
-          attachment_url: attachmentUrl,
-          supabase_id: data.id,
-        });
+        // // Update Dexie row
+        // await db.reports.update(report.id, {
+        //   synced: true,
+        //   attachment_url: attachmentUrl,
+        //   supabase_id: data.id,
+        // });
 
         console.log(`Report ${report.id} synced ✅`);
         onReportSynced(report.description || "Report");
