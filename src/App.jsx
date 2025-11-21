@@ -24,18 +24,24 @@ export default function App() {
   // 🔄 AUTO SYNC WHEN ONLINE
   // ------------------------------
   useEffect(() => {
-    // Run at startup if online
-    if (navigator.onLine) {
-      syncReports();
-    }
+  // Run at startup if online
+  if (navigator.onLine) {
+    syncReports();
+  }
 
-    // Run every time the browser goes online
-    window.addEventListener("online", syncReports);
+  // Handle online events ONCE globally
+  const handleOnline = () => {
+    console.log("App.jsx ONLINE event → syncing once");
+    syncReports();
+  };
 
-    return () => {
-      window.removeEventListener("online", syncReports);
-    };
-  }, []);
+  window.addEventListener("online", handleOnline);
+
+  return () => {
+    window.removeEventListener("online", handleOnline);
+  };
+}, []);
+
 
   return (
     <BrowserRouter>

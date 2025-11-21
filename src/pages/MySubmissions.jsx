@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { db } from "../db";
 import { useNavigate } from "react-router-dom";
-import { syncReports, setSyncStatusListener } from "../lib/sync";
+import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 
 export default function MySubmissions() {
   const [items, setItems] = useState([]);
@@ -37,6 +37,7 @@ export default function MySubmissions() {
     const offlineData = await db.reports
       .where("user_id")
       .equals(userId)
+      .and(r => r.synced === false)
       .toArray();
 
     setItems([...offlineData, ...onlineData]);
@@ -51,10 +52,15 @@ export default function MySubmissions() {
       if (status === "done") loadData();
     });
 
-    const handleOnline = () => syncReports();
-    window.addEventListener("online", handleOnline);
+    // Listen to individual report syncs for toast
+    setReportSyncedListener((reportDesc) => {
+      setToastMessage(`Report synced: ${reportDesc}`);
+    });
 
-    return () => window.removeEventListener("online", handleOnline);
+    // const handleOnline = () => syncReports();
+    // window.addEventListener("online", handleOnline);
+
+    // return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   return (

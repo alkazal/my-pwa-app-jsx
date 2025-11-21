@@ -51,6 +51,7 @@ export default function Home() {
     const offlineReports = await db.reports
       .where("user_id")
       .equals(session.user.id)
+      .and(r => r.synced === false)
       .toArray();
 
     setReports([...offlineReports, ...onlineReports]);
@@ -73,12 +74,13 @@ export default function Home() {
     });
 
     // Auto-sync when back online
-    const handleOnline = () => syncReports();
-    window.addEventListener("online", handleOnline);
+    // const handleOnline = () => syncReports();
+    // window.addEventListener("online", handleOnline);
 
-    return () => {
-      window.removeEventListener("online", handleOnline);
-    };
+    // return () => {
+    //   window.removeEventListener("online", handleOnline);
+    // };
+
   }, []);
 
   const totalReports = reports.length;
@@ -166,7 +168,7 @@ export default function Home() {
       </div>
 
       <button
-        onClick={() => navigate("/new")}
+        onClick={() => navigate("/new-report")}
         className="mt-6 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
       >
         Submit New Report
