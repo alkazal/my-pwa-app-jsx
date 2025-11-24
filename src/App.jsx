@@ -10,6 +10,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Home from "./pages/Home";
 import NewReport from "./pages/NewReport";
 import MySubmissions from "./pages/MySubmissions";
+import ReportDetails from "./pages/ReportDetails";
 
 // import PrivateRoute from "./components/PrivateRoute";
 
@@ -57,6 +58,8 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         {/* <Route path="/test" element={<TestSession />} /> */}
+          
+        <Route path="/report/:id" element={<ReportDetails />} />
 
         {/* Protected routes */}
         <Route

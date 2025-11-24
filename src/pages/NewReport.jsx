@@ -15,12 +15,19 @@ export default function NewReport() {
 
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
+
+     // Generate UUID for the record id (string)
+    const id = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : // fallback if crypto.randomUUID not available:
+      'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
     
     // --------------------------
     // OFFLINE MODE
     // --------------------------
     if (!online) {
-      await db.reports.add({
+      await db.reports.add({ 
+        id,
         report_type: reportType,
         description,
         attachment,

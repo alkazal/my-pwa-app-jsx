@@ -79,7 +79,11 @@ export default function MySubmissions() {
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-4">
         {items.map((x) => (
-          <div key={x.id} className="bg-white shadow rounded-lg p-4">
+          <div 
+              key={x.id}
+              onClick={() => navigate(`/report/${x.id}`)}
+              className="bg-white shadow rounded-lg p-4 cursor-pointer hover:bg-gray-50"
+            >
             {x.attachment_url && (
               <img
                 src={x.attachment_url}

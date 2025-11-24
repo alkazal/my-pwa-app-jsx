@@ -104,7 +104,7 @@ export async function syncReports() {
 
         await db.reports.update(report.id, {
           synced: true,
-          //attachment_url: attachmentUrl,
+          attachment_url: attachmentUrl,          
           supabase_id: data?.id || null,
         });
 

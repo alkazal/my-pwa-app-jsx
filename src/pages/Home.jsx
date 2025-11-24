@@ -147,7 +147,11 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentReports.map((r) => (
-              <div key={r.id} className="bg-white shadow rounded-lg p-4">
+              <div 
+                  key={r.id}
+                  onClick={() => navigate(`/report/${r.id}`)}
+                  className="bg-white shadow rounded-lg p-4 cursor-pointer hover:bg-gray-50"
+                >
                 {r.attachment_url && (
                   <img
                     src={r.attachment_url}
