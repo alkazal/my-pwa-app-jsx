@@ -16,8 +16,8 @@ export default defineConfig({
       },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'My PWA App',
-        short_name: 'MyPWA',
+        name: 'HELPDESK',
+        short_name: 'HDOL',
         description: 'A simple progressive web app built with React + Vite',
         theme_color: '#ffffff',
         background_color: '#ffffff',
