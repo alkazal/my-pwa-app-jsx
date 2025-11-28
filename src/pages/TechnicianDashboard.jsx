@@ -1,0 +1,177 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+import { db } from "../db";
+import { useNavigate } from "react-router-dom";
+
+function statusColor(status) {
+  if (status === "Open") return "text-yellow-600";
+  if (status === "Pending") return "text-orange-600";
+  if (status === "Resolved") return "text-green-600";
+  return "text-gray-600";
+}
+
+export default function TechnicianDashboard() {
+  const [reports, setReports] = useState([]);
+  const [statusUpdates, setStatusUpdates] = useState({});
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadReports();
+
+    const handleOnline = () => {
+      console.log("Online - syncing technician updates");
+      syncReports();   // Your existing sync system
+      loadReports();
+    };
+
+    window.addEventListener("online", handleOnline);
+
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
+
+  async function loadReports() {
+    setLoading(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    // ---- ONLINE ----
+    if (navigator.onLine) {
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("assigned_to", user.id)
+        .order("assigned_at", { ascending: false });
+
+      if (!error) {
+        setReports(data || []);
+      }
+    } 
+    // ---- OFFLINE ----
+    else {
+      const offline = await db.reports
+        .where("assigned_to")
+        .equals(user.id)
+        .toArray();
+
+      setReports(offline || []);
+    }
+
+    setLoading(false);
+  }
+
+  async function updateStatus(reportId) {
+    const newStatus = statusUpdates[reportId];
+
+    if (!newStatus) {
+      alert("Please select a new status");
+      return;
+    }
+
+    if (newStatus === reports.find(r => r.id === reportId)?.status) {
+      alert("Status is already set to this value");
+      return;
+    }
+
+    // ✅ Allowed: Open, Pending, Resolved (manager only can close)
+    if (!["Open", "Pending", "Resolved"].includes(newStatus)) {
+      alert("Invalid status");
+      return;
+    }
+
+    // ---- OFFLINE FIRST ----
+    await db.reports.update(reportId, {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+      synced: false
+    });
+
+    // Sync if online
+    if (navigator.onLine) {
+      const { error } = await supabase
+        .from("reports")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", reportId);
+
+      if (error) {
+        console.error(error);
+        alert("Offline saved — will sync later");
+        return;
+      }
+    }
+
+    alert("✅ Status updated");
+    loadReports();
+  }
+
+  if (loading) return <p className="p-6">Loading...</p>;
+
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">🔧 My Assigned Tickets</h1>
+
+      {reports.length === 0 && (
+        <p className="text-gray-500">No assigned reports</p>
+      )}
+
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {reports.map((r) => (
+          <div key={r.id} className="bg-white shadow rounded-lg p-4 border">
+            <p className="text-sm text-gray-500">{r.ticket_no}</p>
+            <p className="font-semibold text-lg">{r.title}</p>
+            <p className="text-gray-600">{r.description}</p>
+
+            <p className="text-sm mt-2">
+              <b>Status:</b>{" "}
+              <span className={`font-semibold ${statusColor(r.status)}`}>
+                {r.status}
+              </span>
+
+            </p>
+
+            <div className="flex gap-2 mt-4">
+              <select
+                className="border p-2 rounded w-full"
+                value={statusUpdates[r.id] || ""}
+                onChange={(e) =>
+                  setStatusUpdates({
+                    ...statusUpdates,
+                    [r.id]: e.target.value
+                  })
+                }
+              >
+                <option value="">Change status</option>
+                <option value="Open">Open</option>
+                <option value="Pending">Pending</option>
+                <option value="Resolved">Resolved</option>
+              </select>
+
+              <button
+                onClick={() => updateStatus(r.id)}
+                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded"
+              >
+                Update
+              </button>
+            </div>
+
+            <button
+              onClick={() => navigate(`/report/${r.id}`)}
+              className="mt-3 w-full text-blue-600 text-sm underline"
+            >
+              View Details
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

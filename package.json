@@ -13,6 +13,7 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.81.1",
+    "browser-image-compression": "^2.0.2",
     "dexie": "^4.2.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

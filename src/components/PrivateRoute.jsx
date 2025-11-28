@@ -1,40 +1,73 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+// src/components/PrivateRoute.jsx
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 
-export default function PrivateRoute({ children }) {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+// ✅ Get cached app user (saved during login)
+function getCachedUser() {
+  try {
+    const raw = localStorage.getItem("appUser");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("Invalid cached user:", e);
+    return null;
+  }
+}
+
+export default function PrivateRoute({ children, role }) {
+  const [user, setUser] = useState(() => getCachedUser());
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    let ignore = false;
-
-    async function loadSession() {
-      const { data } = await supabase.auth.getSession();
-      if (!ignore) {
-        setSession(data?.session || null);
-        setLoading(false);
-      }
-    }
-
-    loadSession();
-
-    // Listen for login/logout events
+    // Keep in sync with Supabase events
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setSession(session);
+        if (session?.user) {
+          const cached = getCachedUser();
+
+          // trust cached role if present
+          if (cached && cached.id === session.user.id) {
+            setUser(cached);
+          } else {
+            // fallback if cache missing
+            setUser({
+              id: session.user.id,
+              email: session.user.email,
+              role: "user",
+            });
+          }
+
+        } else {
+          // logout event
+          localStorage.removeItem("appUser");
+          setUser(null);
+        }
+
+        setChecking(false);
       }
     );
 
+    // initial load (offline support)
+    setChecking(false);
+
     return () => {
-      ignore = true;
-      listener.subscription.unsubscribe();
+      listener?.subscription?.unsubscribe();
     };
   }, []);
 
-  if (loading) return <div>Loading...</div>;
+  // still checking auth
+  if (checking) {
+    return <div className="p-6 text-center">Checking permission...</div>;
+  }
 
-  if (!session) {
+  // no user at all
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // role-based protection
+  if (role && user.role !== role) {
     return <Navigate to="/login" replace />;
   }
 

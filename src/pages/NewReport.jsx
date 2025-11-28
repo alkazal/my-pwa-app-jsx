@@ -1,104 +1,119 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { db } from "../db";
 import { supabase } from "../lib/supabase";
+import { useNavigate } from "react-router-dom";
+import { syncReports } from "../lib/sync";
+import { compressImage } from "../utils/imageCompressor";
 
 export default function NewReport() {
+  const navigate = useNavigate();
+
   const [reportType, setReportType] = useState("");
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [attachment, setAttachment] = useState(null);
-  const [status, setStatus] = useState("");
+  const [attachments, setAttachments] = useState([]); // multiple files
+  const [error, setError] = useState(null);
+  const [progressMap, setProgressMap] = useState({});
+  const [compressing, setCompressing] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!reportType) return alert("Please select a report type");
+  const handleFileChange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
 
-    const online = navigator.onLine;
+    setCompressing(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    try {
+      const compressedFiles = await Promise.all(
+        files.map(async (file) => {
 
-     // Generate UUID for the record id (string)
-    const id = typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : // fallback if crypto.randomUUID not available:
-      'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-    
-    // --------------------------
-    // OFFLINE MODE
-    // --------------------------
-    if (!online) {
-      await db.reports.add({ 
-        id,
-        report_type: reportType,
-        description,
-        attachment,
-        synced: false,
-        created_at: new Date().toISOString(),
-        user_id: userId || null,
-      });
+          // For non-images, skip compression
+          if (!file.type.startsWith("image/")) {
+            return file;
+          }
 
-      setStatus("Saved offline — will sync when online");
+          const compressed = await compressImage(file, (progress) => {
+            setProgressMap((prev) => ({
+              ...prev,
+              [file.name]: progress
+            }));
+          });
+
+          return compressed;
+        })
+      );
+
+      // ✅ Append instead of replace
+      setAttachments((prev) => [...(prev || []), ...compressedFiles]);
+
+    } catch (err) {
+      console.error("Compression error:", err);
+    }
+
+    setCompressing(false);
+    e.target.value = null;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const user = session?.user;
+    if (!user) {
+      setError("You must be logged in to submit.");
       return;
     }
 
-    // --------------------------
-    // ONLINE MODE
-    // --------------------------
-    let attachmentUrl = null;
+    const reportId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
 
-    // Upload file if exists
-    if (attachment) {
-      const filename = `${Date.now()}-${attachment.name}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("attachments")
-        .upload(filename, attachment);
-
-      if (uploadError) {
-        setStatus("Upload failed");
-        console.error(uploadError);
-        return;
-      }
-
-      // Get public URL
-      const { data } = supabase.storage
-        .from("attachments")
-        .getPublicUrl(filename);
-
-      attachmentUrl = data.publicUrl;
-    }
-
-   
-    // Insert into Supabase
-    const { error: insertError } = await supabase.from("reports").insert({
-        report_type: reportType,
-        description,
-        attachment_url: attachmentUrl,
-        user_id: userId,
+    // Save report to Dexie
+    await db.reports.put({
+      id: reportId,
+      report_type: reportType,
+      title,
+      description,
+      created_at: createdAt,
+      user_id: user.id,
+      synced: false,
+      to_delete: false,
     });
 
-    if (insertError) {
-      setStatus("Failed to submit");
-      console.error(insertError);
-      return;
+    // Save each attachment separately
+    for (const file of attachments) {
+      await db.attachments.put({
+        id: crypto.randomUUID(),
+        report_id: reportId,
+        user_id: user.id,
+        file_name: file.name,
+        file_data: file, // Blob stored offline
+        file_url: null, // filled after sync
+        mime_type: null,
+        synced: false,
+        to_delete: false,
+      });
     }
 
-    setStatus("Submitted successfully 🎉");
+    syncReports();
 
-    // Clear form
-    setReportType("");
-    setDescription("");
-    setAttachment(null);
+    navigate("/submissions");
   };
 
   return (
-    <div className="max-w-xl mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">New Report</h2>
+    <div className="p-4 max-w-lg mx-auto">
+      <h2 className="text-xl font-semibold mb-4">New Report</h2>
 
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-4">
+      {error && (
+        <div className="bg-red-100 text-red-700 p-2 mb-3 rounded">{error}</div>
+      )}
 
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* Report Type */}
         <div>
-          <label className="block text-sm font-medium mb-1">Report Type</label>
+          <label className="block font-medium">Report Type</label>
           <select
             className="w-full border rounded-md p-2"
             value={reportType}
@@ -111,37 +126,80 @@ export default function NewReport() {
           </select>
         </div>
 
+        {/* Title */}
+        <div>
+          <label className="block font-medium">Title</label>
+          <input
+            className="border p-2 rounded w-full"            
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+        </div>
+
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
+          <label className="block font-medium">Description</label>
           <textarea
-            className="w-full border rounded-md p-2 h-32"
-            placeholder="Describe the issue..."
+            className="border p-2 rounded w-full"
+            rows="4"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            required
           />
         </div>
 
-        {/* Attachment */}
+        {/* Attachments */}
         <div>
-          <label className="block text-sm font-medium mb-1">Attachment</label>
+          <label className="block font-medium">Attachments</label>
           <input
             type="file"
-            className="w-full border rounded-md p-2"
-            onChange={(e) => setAttachment(e.target.files[0])}
+            multiple
+            onChange={handleFileChange}
+            className="block mt-2"
           />
+          {compressing && (
+            <div className="space-y-2 mt-4">
+              {Object.entries(progressMap).map(([name, progress]) => (
+                <div key={name}>
+                  <p className="text-sm font-medium mb-1">{name}</p>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-200"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* File Previews */}
+          {attachments.length > 0 && (
+            <ul className="mt-3 bg-gray-100 p-2 rounded">
+              {attachments.map((file, idx) => (
+                <li key={idx} className="text-sm text-gray-700">
+                  📎 {file.name} ({Math.round(file.size / 1024)} KB)
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {compressing && (
+            <p className="text-blue-500">
+              Compressing {attachments.length} images...
+            </p>
+          )}
         </div>
 
-        {/* Submit */}
+        {/* Submit Button */}
         <button
-          className="bg-blue-600 text-white w-full py-2 rounded-md hover:bg-blue-700"
-          onClick={handleSubmit}
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded mt-3 w-full"
         >
           Submit Report
         </button>
-
-        <p className="text-green-700 font-medium mt-2">{status}</p>
-      </div>
+      </form>
     </div>
   );
 }

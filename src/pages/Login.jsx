@@ -12,7 +12,7 @@ export default function Login() {
   const handleLogin = async () => {
     setStatus("");
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -21,6 +21,26 @@ export default function Login() {
       setStatus("Invalid login credentials");
       return;
     }
+
+    const session = data.session;
+    const user = session?.user;
+
+    // fetch role from user_profiles
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("role, full_name")
+      .eq("id", user.id)
+      .single();
+
+    // cache for offline use
+    const cachedUser = {
+      id: user.id,
+      email: user.email,
+      role: profile?.role || "user",
+      full_name: profile?.full_name || "",
+    };
+
+    localStorage.setItem("appUser", JSON.stringify(cachedUser));
 
     navigate("/");
   };

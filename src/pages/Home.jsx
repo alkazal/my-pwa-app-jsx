@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { db } from "../db";
 import { useNavigate } from "react-router-dom";
-import Toast from "../components/Toast";
-import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
+//import Toast from "../components/Toast";
+//import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
+import {setSyncStatusListener, setReportSyncedListener,clearSyncListeners } from "../lib/syncEvents";
 
 import {
   BarChart,
@@ -23,6 +24,24 @@ export default function Home() {
   const [toastMessage, setToastMessage] = useState("");
   const navigate = useNavigate();
 
+  // useEffect(() => {
+  //   async function debugRole() {
+  //     const { data: { session } } = await supabase.auth.getSession();
+
+  //     console.log("SESSION USER:", session?.user?.email, session?.user?.id);
+
+  //     const { data, error } = await supabase
+  //       .from("user_profiles")
+  //       .select("role")
+  //       .eq("id", session.user.id)
+  //       .single();
+
+  //     console.log("ROLE FROM DB:", data, error);
+  //   }
+
+  //   debugRole();
+  // }, []);
+  
   // Load reports
   const loadReports = async () => {
     setLoading(true);
@@ -34,6 +53,15 @@ export default function Home() {
     }
 
     setUser(session.user);
+
+
+    // const { data } = await supabase
+    //   .from("user_profiles")
+    //   .select("role")
+    //   .eq("id", session.user.id)
+    //   .single();
+
+    // console.log("MY ROLE →", data.role);
 
     // Online reports
     let onlineReports = [];
@@ -69,9 +97,9 @@ export default function Home() {
     });
 
     // Listen to individual report syncs for toast
-    setReportSyncedListener((reportDesc) => {
-      setToastMessage(`Report synced: ${reportDesc}`);
-    });
+    // setReportSyncedListener((reportDesc) => {
+    //   setToastMessage(`Report synced: ${title}`);
+    // });
 
     // Auto-sync when back online
     // const handleOnline = () => syncReports();
@@ -80,6 +108,7 @@ export default function Home() {
     // return () => {
     //   window.removeEventListener("online", handleOnline);
     // };
+    return () => clearSyncListeners();
 
   }, []);
 
@@ -159,8 +188,8 @@ export default function Home() {
                     className="w-full h-32 object-cover rounded mb-2"
                   />
                 )}
-                <p className="font-semibold">{r.report_type}</p>
-                <p className="text-gray-600 text-sm truncate">{r.description}</p>
+                <p className="font-semibold">{r.title}</p>
+                <p className="text-gray-600 text-sm">{r.report_type}</p>                
                 <p className="text-xs text-gray-400">
                   {new Date(r.created_at).toLocaleString()}
                 </p>
@@ -178,10 +207,10 @@ export default function Home() {
         Submit New Report
       </button>
 
-      <Toast
+      {/* <Toast
         message={toastMessage}
         onClose={() => setToastMessage("")}
-      />
+      /> */}
     </div>
   );
 }

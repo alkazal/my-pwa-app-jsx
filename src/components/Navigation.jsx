@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 import HomeIcon from "@heroicons/react/24/outline/HomeIcon";
@@ -8,9 +9,58 @@ import ArrowRightIcon from "@heroicons/react/24/outline/ArrowRightIcon";
 
 export default function Navigation() {
   const navigate = useNavigate();
+  const [role, setRole] = useState(null);
+  
+  useEffect(() => {
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      console.log("INITIAL SESSION:", session);
+
+      if (session) {
+        loadRole(session.user.id);
+      }
+    };
+
+    const loadRole = async (userId) => {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      console.log("ROLE FROM DB:", data, error);
+
+      if (data?.role) {
+        setRole(data.role);
+      }
+    };
+
+    // 1. Load initial session
+    getInitialSession();
+
+    // 2. Listen for future login/logout changes
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        console.log("AUTH EVENT:", _event, session);
+
+        if (session?.user) {
+          loadRole(session.user.id);
+        } else {
+          setRole(null);
+        }
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem("appUser");
     navigate("/login");
   };
 
@@ -25,8 +75,22 @@ export default function Navigation() {
       <nav className="hidden md:flex items-center justify-between bg-white shadow px-6 py-3 sticky top-0 z-50">
         <div className="flex space-x-6 text-lg">
           <NavLink to="/" className={linkClass}>Dashboard</NavLink>
-          <NavLink to="/submissions" className={linkClass}>Reports</NavLink>
+          <NavLink to="/submissions" className={linkClass}>Reports</NavLink>     
+          
+          {role === "manager" && (
+            <NavLink to="/assign" className={linkClass}>
+              Assign Reports
+            </NavLink>
+          )}
+
+          {role === "technician" && (
+            <NavLink to="/technician" className={linkClass}>
+              Technician Board
+            </NavLink>
+          )}
+
           <NavLink to="/new-report" className={linkClass}>New Report</NavLink>
+
         </div>
 
         <button

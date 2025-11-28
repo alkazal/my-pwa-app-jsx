@@ -1,129 +1,298 @@
 import { supabase } from "./supabase";
 import { db } from "../db";
+import { emitSyncStatus, emitReportSynced } from "./syncEvents";
 
-let onStatusChange = () => {};
-export function setSyncStatusListener(fn) { onStatusChange = fn; }
+/* ===============================
+   HELPER: Detect MIME TYPE
+================================ */
+function getMimeType(att) {
+  if (att.mime_type) return att.mime_type;
+  if (att.file?.type) return att.file.type;
 
-let onReportSynced = () => {};
-export function setReportSyncedListener(fn) { onReportSynced = fn; }
+  if (att.file_name) {
+    const ext = att.file_name.split(".").pop().toLowerCase();
+    const map = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+      pdf: "application/pdf",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    };
 
+    return map[ext] || "application/octet-stream";
+  }
+
+  return "application/octet-stream";
+}
+
+/* ===============================
+   SYNC FUNCTION
+================================ */
 export async function syncReports() {
-  console.log("syncReports: start");
-  onStatusChange("syncing");
+  console.log("SYNC: starting");
+  emitSyncStatus("syncing");
 
   try {
+    /* ---------------------------------
+       CHECK USER SESSION
+    ----------------------------------*/
     const { data: { session } } = await supabase.auth.getSession();
-    console.log("syncReports: session", !!session);
     const user = session?.user;
-    if (!user) {
-      console.warn("syncReports: no session - abort");
-      onStatusChange("nosession");
-      return { ok: false, reason: "nosession" };
+
+    if (!user?.id) {
+      console.warn("SYNC: No session");
+      emitSyncStatus("login_required");
+      return;
     }
 
-    // make sure user.id is valid
-    if (!user.id || typeof user.id !== "string") {
-      console.warn("syncReports: invalid user id", user);
-      onStatusChange("nosession");
-      return { ok: false, reason: "invalid_user" };
+    /* =========================================================
+       1. DELETE ATTACHMENTS (from Dexie → Supabase → Storage)
+    ========================================================== */
+    const attachmentsToDelete = await db.attachments
+      .filter(a => a?.to_delete === true)
+      .toArray();
+
+    for (const att of attachmentsToDelete) {
+      try {
+        console.log("Deleting attachment", att.id);
+
+        // Delete attachment record
+        await supabase
+          .from("attachments")
+          .delete()
+          .eq("id", att.id);
+
+        // Remove from Supabase bucket
+        if (att.file_url) {
+          const path = att.file_url.split("/storage/v1/object/public/attachments/")[1];
+          if (path) {
+            await supabase.storage
+              .from("attachments")
+              .remove([path]);
+          }
+        }
+
+        // Remove from Dexie
+        await db.attachments.delete(att.id);
+      } catch (err) {
+        console.error("❌ Failed to delete attachment:", err);
+      }
     }
 
-    // safe query: include only rows with valid id & user_id
-    const unsyncedAll = await db.reports.filter(r => r && (r.synced === false || r.synced === 0)).toArray();
-    console.log("syncReports: unsyncedAll count", unsyncedAll.length);
+    /* =========================================================
+       2. DELETE REPORTS (cascade delete attachments)
+    ========================================================== */
+    const reportsToDelete = await db.reports
+      .filter(r => r?.to_delete === true)
+      .toArray();
 
-    // filter client-side for user id to avoid index issues
-    const unsynced = unsyncedAll.filter(r => r.user_id === user.id);
-    console.log("syncReports: unsynced for user", unsynced.length);
+    for (const rep of reportsToDelete) {
+      try {
+        console.log("Deleting report", rep.id);
 
-    if (unsynced.length === 0) {
-      onStatusChange("done");
-      console.log("syncReports: nothing to sync");
-      return { ok: true, synced: 0 };
+        // Delete from Supabase (report)
+        await supabase
+          .from("reports")
+          .delete()
+          .eq("id", rep.id);
+
+        // Delete attachments in Supabase related to report
+        const { data: attOnline } = await supabase
+          .from("attachments")
+          .select("id, file_url")
+          .eq("report_id", rep.id);
+
+        if (attOnline) {
+          for (const a of attOnline) {
+            if (a.file_url) {
+              const path = a.file_url.split("/storage/v1/object/public/attachments/")[1];
+              if (path) {
+                await supabase.storage
+                  .from("attachments")
+                  .remove([path]);
+              }
+            }
+
+            await supabase
+              .from("attachments")
+              .delete()
+              .eq("id", a.id);
+          }
+        }
+
+        // Remove local attachments
+        const localAtt = await db.attachments
+          .filter(a => a.report_id === rep.id)
+          .toArray();
+
+        for (const a of localAtt) {
+          await db.attachments.delete(a.id);
+        }
+
+        // Remove local report
+        await db.reports.delete(rep.id);
+
+      } catch (err) {
+        console.error("❌ Failed deleting report:", rep.id, err);
+      }
     }
 
-    let syncedCount = 0;
+    /* =========================================================
+       3. SYNC UNSYNCED REPORTS (INSERT / UPDATE)
+    ========================================================== */
+    const unsyncedReports = await db.reports
+      .filter(r => r && (r.synced === false || r.synced === "false"))
+      .toArray();
 
-    for (const report of unsynced) {
-      if (!report.id) {
-        console.warn("skip report without id", report);
+    console.log("Unsynced reports:", unsyncedReports.length);
+
+    for (const report of unsyncedReports) {
+
+      if (!report.id || typeof report.id !== "string") {
+        console.warn("Invalid report id, skipping", report);
         continue;
       }
 
       try {
-        console.log("syncReports: processing report", report.id);
+        // UPSERT report
+        const { error } = await supabase
+          .from("reports")
+          .upsert({
+            id: report.id,
+            user_id: user.id,
+            title: report.title,
+            description: report.description,
+            report_type: report.report_type,
+            created_at: report.created_at,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "id" });
 
-        let attachmentUrl = report.attachment_url || null;
+        if (error) {
+          console.error("❌ Failed to upsert report:", error);
+          continue;
+        }
 
-        if (report.attachment && !report.attachment_url) {
+        /* -----------------------------------------
+           SYNC ATTACHMENTS FOR THIS REPORT
+        ------------------------------------------*/
+        const localAttachments = await db.attachments
+          .filter(a => a.report_id === report.id && a.synced === false && a.to_delete !== true)
+          .toArray();
+
+        for (const att of localAttachments) {
           try {
-            const filename = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${report.attachment.name || "file"}`;
-            console.log("syncReports: uploading", filename, report.attachment);
+            const fileBlob = att.file || att.file_data;
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            if (!fileBlob) {
+              console.warn("Attachment has no blob:", att.id);
+              continue;
+            }
+
+            const mime = getMimeType(att);
+
+            const ext = (att.file_name || "file").split(".").pop();
+            const storagePath = `attachments/${report.id}/${att.id}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
               .from("attachments")
-              .upload(filename, report.attachment);
+              .upload(storagePath, fileBlob, { upsert: true });
 
             if (uploadError) {
-              console.error("syncReports: uploadError", uploadError);
-              continue; // skip this report, move to next
+              console.error("❌ Upload failed:", uploadError);
+              continue;
             }
 
             const { data: publicData } = supabase.storage
               .from("attachments")
-              .getPublicUrl(filename);
+              .getPublicUrl(storagePath);
 
-            attachmentUrl = publicData?.publicUrl || null;
-            console.log("syncReports: uploaded url", attachmentUrl);
-          } catch (uplErr) {
-            console.error("syncReports: upload thrown", uplErr);
-            continue;
+            const publicUrl = publicData?.publicUrl;
+
+            await supabase
+              .from("attachments")
+              .upsert({
+                id: att.id,
+                report_id: report.id,
+                user_id: user.id,
+                file_url: publicUrl,
+                file_name: att.file_name,
+                mime_type: mime
+              }, { onConflict: "id" });
+
+            await db.attachments.update(att.id, {
+              synced: true,
+              file_url: publicUrl,
+              mime_type: mime
+            });
+
+          } catch (err) {
+            console.error("❌ Error syncing attachment:", err);
           }
         }
 
-        // Insert row
-        const insertPayload = {
-          report_type: report.report_type,
-          description: report.description,
-          attachment_url: attachmentUrl,
-          user_id: user.id,
-          created_at: report.created_at || new Date().toISOString(),
-        };
-        console.log("syncReports: inserting payload", insertPayload);
+        await db.reports.update(report.id, { synced: true });
 
-        const { data, error: insertError } = await supabase
-          .from("reports")
-          .insert(insertPayload)
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("syncReports: insertError", insertError);
-          continue;
-        }
-
-        await db.reports.update(report.id, {
-          synced: true,
-          attachment_url: attachmentUrl,          
-          supabase_id: data?.id || null,
-        });
-
-        console.log(`syncReports: report ${report.id} synced -> supabase id ${data?.id}`);
-        syncedCount++;
-        try { onReportSynced(report.description || `Report ${report.id}`); } catch(e){}
+        emitReportSynced(report.title || report.description || report.id);
 
       } catch (err) {
-        console.error("syncReports: per-report error", err, report);
+        console.error("❌ Error syncing report:", err);
       }
     }
 
-    onStatusChange("done");
-    console.log("syncReports: finished, syncedCount=", syncedCount);
-    return { ok: true, synced: syncedCount };
+    /* =========================================================
+       4. PULL LATEST REPORTS FROM SUPABASE
+    ========================================================== */
+    const { data: onlineReports } = await supabase
+      .from("reports")
+      .select("*")
+      .eq("user_id", user.id);
 
-  } catch (err) {
-    console.error("Sync failed:", err);
-    onStatusChange("error");
-    return { ok: false, reason: err };
+    if (onlineReports) {
+      for (const r of onlineReports) {
+        await db.reports.put({
+          id: r.id,
+          user_id: r.user_id,
+          title: r.title,
+          description: r.description,
+          report_type: r.report_type,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+          synced: true
+        });
+
+        const { data: atts } = await supabase
+          .from("attachments")
+          .select("*")
+          .eq("report_id", r.id);
+
+        if (atts) {
+          for (const a of atts) {
+            await db.attachments.put({
+              id: a.id,
+              report_id: r.id,
+              user_id: a.user_id,
+              file_name: a.file_name,
+              file_url: a.file_url,
+              mime_type: a.mime_type,
+              synced: true,
+              file: null,
+              file_data: null
+            });
+          }
+        }
+      }
+    }
+
+    emitSyncStatus("done");
+    console.log("✅ SYNC COMPLETE");
+
+  } catch (error) {
+    console.error("💥 SYNC ERROR:", error);
+    emitSyncStatus("error");
   }
 }

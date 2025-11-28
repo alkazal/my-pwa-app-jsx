@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { setSyncStatusListener } from "../lib/sync";
+import { setSyncStatusListener } from "../lib/syncEvents";
 
 export default function SyncStatus() {
   const [status, setStatus] = useState("idle");

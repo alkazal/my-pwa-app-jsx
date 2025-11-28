@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { db } from "../db";
 import { useNavigate } from "react-router-dom";
-import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
+//import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
+import { setSyncStatusListener, setReportSyncedListener } from "../lib/syncEvents";
 
 export default function MySubmissions() {
   const [items, setItems] = useState([]);
@@ -53,9 +54,9 @@ export default function MySubmissions() {
     });
 
     // Listen to individual report syncs for toast
-    setReportSyncedListener((reportDesc) => {
-      setToastMessage(`Report synced: ${reportDesc}`);
-    });
+    // setReportSyncedListener((reportDesc) => {
+    //   setToastMessage(`Report synced: ${reportDesc}`);
+    // });
 
     // const handleOnline = () => syncReports();
     // window.addEventListener("online", handleOnline);
@@ -89,8 +90,9 @@ export default function MySubmissions() {
                 src={x.attachment_url}
                 className="w-full h-40 object-cover rounded mb-2"
               />
-            )}
-            <h2 className="text-lg font-semibold">{x.description}</h2>
+            )}            
+            <h2 className="text-lg font-semibold">{x.title}</h2>
+            <p className="font-semibold">{x.repor_type}</p>
             <p className="text-sm text-gray-600">
               {new Date(x.created_at).toLocaleString()}
             </p>

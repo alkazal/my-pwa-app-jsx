@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import ProtectedRoute from "./components/ProtectedRoute";
 import { useEffect } from "react";
 
 import Login from "./pages/Login";
@@ -11,11 +10,16 @@ import Home from "./pages/Home";
 import NewReport from "./pages/NewReport";
 import MySubmissions from "./pages/MySubmissions";
 import ReportDetails from "./pages/ReportDetails";
+import EditReport from "./pages/EditReport";
+import AssignReport from "./pages/AssignReport";
+import TechnicianDashboard from "./pages/TechnicianDashboard";
 
-// import PrivateRoute from "./components/PrivateRoute";
+import TestSession from "./TestSession"
+import ProtectedRoute from "./components/ProtectedRoute";
+import PrivateRoute from "./components/PrivateRoute";
 
 import SyncStatus from "./components/SyncStatus";
-import { syncReports } from "./lib/sync";
+import { initAutoSync } from "./lib/syncAuto";
 
 import Navigation from "./components/Navigation";
 
@@ -26,21 +30,21 @@ export default function App() {
   // ------------------------------
   useEffect(() => {
   // Run at startup if online
-  if (navigator.onLine) {
-    syncReports();
-  }
-
+  // if (navigator.onLine) {
+  //   syncReports();
+  // }
+    initAutoSync();
   // Handle online events ONCE globally
-  const handleOnline = () => {
-    console.log("App.jsx ONLINE event → syncing once");
-    syncReports();
-  };
+  // const handleOnline = () => {
+  //   console.log("App.jsx ONLINE event → syncing once");
+  //   syncReports();
+  // };
 
-  window.addEventListener("online", handleOnline);
+  //window.addEventListener("online", handleOnline);
 
-  return () => {
-    window.removeEventListener("online", handleOnline);
-  };
+  // return () => {
+  //   window.removeEventListener("online", handleOnline);
+  // };
 }, []);
 
 
@@ -51,45 +55,70 @@ export default function App() {
       <div className="pb-20 md:pb-0"> 
 
         <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        {/* <Route path="/" element={<Home />} /> */}
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        {/* <Route path="/test" element={<TestSession />} /> */}
-          
-        <Route path="/report/:id" element={<ReportDetails />} />
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          {/* <Route path="/" element={<Home />} /> */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/test" element={<TestSession />} />
+          <Route path="/report/:id" element={<ReportDetails />} />
+          <Route path="/report/:id/edit" element={<EditReport />} />
+          {/* Protected routes */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/new-report"
+            element={
+              <ProtectedRoute>
+                <NewReport />
+              </ProtectedRoute>
+              // <PrivateRoute>
+              //   <NewReport />
+              // </PrivateRoute>
+            }
+          />
+          <Route
+            path="/submissions"
+            element={
+              <ProtectedRoute>
+                <MySubmissions />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assign"
+            element={
+              <PrivateRoute role="manager">
+                <AssignReport />
+              </PrivateRoute>           
+            }
+          />
 
-        {/* Protected routes */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/new-report"
-          element={
-            <ProtectedRoute>
-              <NewReport />
-            </ProtectedRoute>
-            // <PrivateRoute>
-            //   <NewReport />
-            // </PrivateRoute>
-          }
-        />
-        <Route
-          path="/submissions"
-          element={
-            <ProtectedRoute>
-              <MySubmissions />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/technician"
+            element={
+              <PrivateRoute role="technician">
+                <TechnicianDashboard />
+              </PrivateRoute>
+            }
+          />
+          {/* <Route
+            path="/admin-reports"
+            element={
+              <PrivateRoute role={["manager", "admin"]}>
+                <AdminReports />
+              </PrivateRoute>
+            }
+          /> */}
         </Routes>
+
         
       </div>
       
