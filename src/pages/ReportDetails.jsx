@@ -1,276 +1,251 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../db";
 import { supabase } from "../lib/supabase";
-import { deleteReport } from "../utils/deleteReport";
+
+// For image modal
+function Modal({ url, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <img
+        src={url}
+        className="max-h-[90vh] max-w-[90vw] rounded shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+}
 
 export default function ReportDetails() {
-  const { id } = useParams();       // report_id
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [report, setReport] = useState(null);
   const [attachments, setAttachments] = useState([]);
+  const [modalUrl, setModalUrl] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [previewFile, setPreviewFile] = useState(null);
 
-  // -----------------------------------------------------------
-  // Load report + attachments (offline-first)
-  // -----------------------------------------------------------
+  // ----------------------------------------------------
+  // LOAD REPORT (Offline first, then online fallback)
+  // ----------------------------------------------------
   useEffect(() => {
-    async function loadReport() {
+    async function load() {
       setLoading(true);
 
-      // 1️⃣ Try Local DB first
-      let localReport = await db.reports.get(id);
-
-      if (localReport) {
-        setReport(localReport);
-        const localAtt = await db.attachments.where("report_id").equals(id).toArray();
-        setAttachments(localAtt);
-        setLoading(false);
-        return;
+      // 1. Try Dexie first
+      const local = await db.reports.get(id);
+      if (local) {
+        setReport(local);
+        const att = await db.attachments
+          .where("report_id")
+          .equals(id)
+          .and((a) => !a.to_delete)
+          .toArray();
+        setAttachments(att);
       }
 
-      // 2️⃣ If offline & no local report -> stop
-      if (!navigator.onLine) {
-        setLoading(false);
-        return;
-      }
+      // 2. If online → fetch fresh version from Supabase
+      if (navigator.onLine) {
+        const { data: online, error } = await supabase
+          .from("reports")
+          .select(
+            `
+            *,
+            reporter:user_id ( full_name ),
+            technician:assigned_to ( full_name ),
+            history:report_status_history (
+              id,
+              old_status,
+              new_status,
+              changed_at,
+              comment,
+              changed_by,
+              changed_by_name
+            )
+          `
+          )
+          .eq("id", id)
+          .single();
 
-      // 3️⃣ Otherwise fetch from Supabase
-      const { data: onlineReport } = await supabase
-        .from("reports")
-        .select("*")
-        .eq("id", id)
-        .single();
+        if (!error && online) {
+          setReport(online);
 
-      if (onlineReport) {
-        setReport(onlineReport);
+          const { data: onlineAtt } = await supabase
+            .from("attachments")
+            .select("*")
+            .eq("report_id", id);
 
-        // fetch attachments metadata
-        const { data: onlineAttachments } = await supabase
-          .from("attachments")
-          .select("*")
-          .eq("report_id", id);
-
-        setAttachments(onlineAttachments || []);
+          setAttachments(onlineAtt || []);
+        }
       }
 
       setLoading(false);
     }
 
-    loadReport();
+    load();
   }, [id]);
 
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === "Escape") {
-        setPreviewFile(null);
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
-
-  if (loading) return <p className="p-4">Loading...</p>;
-
+  if (loading) return <p className="p-6">Loading...</p>;
   if (!report)
-    return (
-      <div className="p-4">
-        <p className="text-red-500">Report not found (offline and not cached).</p>
-      </div>
-    );
+    return <p className="p-6 text-red-500">Report not found</p>;
+
+  // ----------------------------------------------------
+  // TIMELINE PREPARATION
+  // ----------------------------------------------------
+  const baseTimeline = [];
+
+  // Submitted
+  if (report.created_at) {
+    baseTimeline.push({
+      label: "Submitted",
+      at: report.created_at,
+      by: report.reporter?.full_name || report.user_id,
+      comment: "Initial submission",
+    });
+  }
+
+  // Assigned
+  if (report.assigned_at) {
+    baseTimeline.push({
+      label: "Assigned (New)",
+      at: report.assigned_at,
+      by: report.technician?.full_name,
+      comment: "Ticket assigned to technician",
+    });
+  }
+
+  // Closed
+  if (report.closed_at) {
+    baseTimeline.push({
+      label: "Closed",
+      at: report.closed_at,
+      by: report.updated_by_name,
+      comment: report.closing_notes,
+    });
+  }
+
+  // Add detailed `_status_changes`
+  const history = (report.history || []).map((h) => ({
+    label: `${h.old_status} → ${h.new_status}`,
+    at: h.changed_at,
+    by: h.changed_by_name,
+    comment: h.comment,
+  }));
+
+  // Final timeline = base + history sorted by date
+  const fullTimeline = [...baseTimeline, ...history].sort(
+    (a, b) => new Date(a.at) - new Date(b.at)
+  );
+
+  console.log("Report:", report);
+  console.log("FullTimeline:", fullTimeline);
 
   return (
-    <div className="p-4">
-      {/* BACK BUTTON */}
+    <div className="p-6 max-w-4xl mx-auto">
       <button
-        className="mb-3 text-blue-600 underline text-sm"
         onClick={() => navigate(-1)}
+        className="text-blue-600 underline mb-4"
       >
         ← Back
       </button>
 
-      {/* REPORT HEADER */}
-      <h1 className="text-xl font-bold">{report.title}</h1>
-      <p className="text-gray-600 text-sm">{report.report_type}</p>
+      <h1 className="text-2xl font-bold mb-2">{report.title}</h1>
 
-      <p className="mt-3">{report.description}</p>
+      <p className="text-gray-700">{report.description}</p>
 
-      {/* CREATED DATE */}
-      {report.created_at && (
-        <p className="mt-2 text-xs text-gray-500">
-          Created at: {new Date(report.created_at).toLocaleString()}
+      <div className="mt-3 text-sm text-gray-600">
+        <p>
+          <b>Ticket No:</b> {report.ticket_no}
         </p>
-      )}
-
-      {/* ------------------------------------------------------- */}
-      {/* ATTACHMENTS SECTION */}
-      {/* ------------------------------------------------------- */}
-      <div className="mt-6">
-        <h3 className="text-lg font-semibold mb-2">
-          Attachments ({attachments.length})
-        </h3>
-
-        {attachments.length === 0 && (
-          <p className="text-gray-500 text-sm">No attachments.</p>
+        <p>
+          <b>Status:</b>{" "}
+          <span className="text-blue-600">{report.status}</span>
+        </p>
+        <p>
+          <b>Submitted by:</b>{" "}
+          {report.reporter?.full_name || report.user_id}
+        </p>
+        {report.technician && (
+          <p>
+            <b>Assigned to:</b> {report.technician.full_name}
+          </p>
         )}
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {attachments.map((att) => {
-            const isImage = att.mime_type?.startsWith("image");
-
-            // Fallback URL:
-            // - If online: att.file_url
-            // - If offline: att.file_data or att.file (Blob)
-            let fileUrl = att.file_url;
-
-            if (!fileUrl && (att.file || att.file_data)) {
-              // Convert blob to URL
-              fileUrl = URL.createObjectURL(att.file || att.file_data);
-            }
-
-            return (
-              <div
-                key={att.id}
-                className="border rounded-md p-2 shadow-sm bg-white"
-              >
-                {/* Thumbnail Preview */}
-                {isImage ? (
-                  <img
-                      src={fileUrl}
-                      alt={att.file_name}
-                      onClick={() =>
-                        setPreviewFile({
-                          url: fileUrl,
-                          name: att.file_name,
-                          type: att.mime_type,
-                        })
-                      }
-                      className="w-full h-28 object-cover rounded cursor-pointer hover:opacity-80"
-                    />
-                ) : (
-                  <div className="w-full h-28 bg-gray-200 flex items-center justify-center rounded">
-                    <span className="text-gray-600 text-sm">📄 File</span>
-                  </div>
-                )}
-
-                {/* Filename */}
-                <p className="text-xs mt-2 text-gray-700 truncate">
-                  {att.file_name}
-                </p>
-
-                {/* Actions */}
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() =>
-                      setPreviewFile({
-                        url: fileUrl,
-                        name: att.file_name,
-                        type: att.mime_type,
-                      })
-                    }
-                    className="text-blue-600 text-xs underline"
-                  >
-                    View
-                  </button>
-
-                  <a
-                    href={fileUrl}
-                    download={att.file_name}
-                    className="text-blue-600 text-xs underline"
-                  >
-                    Download
-                  </a>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
-      {/* EDIT BUTTON */}
-      <button
-        className="mt-6 w-full bg-blue-600 text-white py-2 rounded"
-        onClick={() => navigate(`/report/${id}/edit`)}
-      >
-        Edit Report
-      </button>
-      <button
-        className="mt-6 w-full bg-red-600 text-white py-2 rounded"
-        onClick={async () => {
-          if (confirm("Delete this report?")) {
-            await deleteReport(report);
-            navigate("/");
-          }
-        }}        
-      >
-        Delete
-      </button>
+      {/* ----------------------------------------------------
+          ATTACHMENTS
+      ---------------------------------------------------- */}
+      <h2 className="text-xl font-semibold mt-6 mb-2">
+        Attachments ({attachments.length})
+      </h2>
 
-      {/* ===================== PREVIEW MODAL ===================== */}
-      {previewFile && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-3xl rounded-lg p-4 relative">
-            
-            {/* Close button */}
-            <button
-              onClick={() => setPreviewFile(null)}
-              className="absolute top-2 right-3 text-gray-500 hover:text-black text-lg"
-            >
-              ✕
-            </button>
-
-            {/* File name */}
-            <p className="text-sm mb-3 font-semibold truncate">
-              {previewFile.name}
-            </p>
-
-            {/* Preview content */}
-            {previewFile.type?.startsWith("image") ? (
-              <img
-                src={previewFile.url}
-                className="w-full max-h-[75vh] object-contain rounded"
-              />
-            ) : previewFile.type === "application/pdf" ? (
-              <iframe
-                src={previewFile.url}
-                className="w-full h-[75vh] rounded"
-                title="PDF Preview"
-              />
-            ) : (
-              <div className="flex flex-col items-center p-10">
-                <p className="mb-4">Cannot preview this file type</p>
-                <a
-                  href={previewFile.url}
-                  download
-                  className="bg-blue-600 text-white px-4 py-2 rounded"
-                >
-                  Download
-                </a>
-              </div>
-            )}
-
-            {/* Bottom actions */}
-            <div className="mt-4 flex justify-end gap-3">
-              <a
-                href={previewFile.url}
-                download
-                className="bg-green-600 text-white px-4 py-2 rounded"
-              >
-                Download
-              </a>
-              <button
-                onClick={() => setPreviewFile(null)}
-                className="bg-gray-300 px-4 py-2 rounded"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {attachments.length === 0 && (
+        <p className="text-gray-500 text-sm">No attachments</p>
       )}
 
-    </div>    
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {attachments.map((att) => {
+          const isImg = att.mime_type?.startsWith("image/");
+          const url =
+            att.file_url ||
+            (att.file_data && URL.createObjectURL(att.file_data));
+
+          return (
+            <div
+              key={att.id}
+              className="border rounded p-2 bg-white shadow-sm cursor-pointer"
+              onClick={() => isImg && setModalUrl(url)}
+            >
+              {isImg ? (
+                <img
+                  src={url}
+                  className="h-32 w-full object-cover rounded"
+                />
+              ) : (
+                <div className="h-32 bg-gray-200 flex items-center justify-center rounded">
+                  📄
+                </div>
+              )}
+
+              <p className="text-xs mt-1 truncate">{att.file_name}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Image Preview Modal */}
+      {modalUrl && (
+        <Modal url={modalUrl} onClose={() => setModalUrl(null)} />
+      )}
+
+      {/* ----------------------------------------------------
+          STATUS TIMELINE
+      ---------------------------------------------------- */}
+      <h2 className="text-xl font-semibold mt-8 mb-3">
+        Status Timeline
+      </h2>
+
+      <div className="border-l-4 border-blue-600 pl-4 space-y-4">
+        {fullTimeline.map((item, i) => (
+          <div key={i} className="relative">
+            <div className="absolute -left-3 top-1 w-3 h-3 bg-blue-600 rounded-full" />
+
+            <p className="font-semibold">{item.label}</p>
+            <p className="text-sm text-gray-600">
+              {new Date(item.at).toLocaleString()} — {item.by}
+            </p>
+
+            {item.comment && (
+              <p className="text-gray-700 text-sm mt-1">
+                💬 {item.comment}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

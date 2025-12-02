@@ -11,22 +11,27 @@ export default function AssignReport() {
 
   useEffect(() => {
     loadData();
+    // // Re-sync when back online
+    // const handleOnline = () => {
+    //   syncReports();
+    //   loadData();
+    // };
 
-    // Re-sync when back online
-    const handleOnline = () => {
-      syncReports();
-      loadData();
-    };
-
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-
+    // window.addEventListener("online", handleOnline);
+    // return () => window.removeEventListener("online", handleOnline);
   }, []);
 
+  // --------------------------
+  // LOAD REPORTS + TECHNICIANS
+  // --------------------------
   async function loadData() {
     setLoading(true);
 
-    // ✅ ONLINE MODE
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) return;
+
+    // Fetch unassigned reports online
     if (navigator.onLine) {
       const { data: reportsData, error: repErr } = await supabase
         .from("reports")
@@ -36,56 +41,73 @@ export default function AssignReport() {
 
       if (repErr) console.error(repErr);
       else setReports(reportsData || []);
-
-      const { data: techData, error: techErr } = await supabase
-        .from("user_profiles")
-        .select("id, full_name")
-        .eq("role", "technician");
-
-      if (techErr) console.error(techErr);
-      else setTechnicians(techData || []);
-
-    } 
-    // ✅ OFFLINE MODE
+    }
     else {
-      const offlineReports = await db.reports
+      // OFFLINE fallback
+      const offline = await db.reports
         .where("status")
         .equals("Submitted")
         .toArray();
-
-      setReports(offlineReports || []);
-
-      const offlineTech = await db.user_profiles
-        ?.where("role")
-        ?.equals("technician")
-        ?.toArray();
-
-      if (offlineTech) setTechnicians(offlineTech);
+      setReports(offline || []);
     }
+
+    // Fetch list of technicians
+    const { data: techData, error: techErr } = await supabase
+      .from("user_profiles")
+      .select("id, full_name")
+      .eq("role", "technician");
+
+    if (techErr) console.error(techErr);
+    else setTechnicians(techData || []);
 
     setLoading(false);
   }
 
-  // ✅ Assign action (offline first)
+  // --------------------------
+  // ASSIGN ACTION (offline-first)
+  // --------------------------
   async function handleAssign(reportId) {
     const technicianId = selectedTech[reportId];
 
-    if (!technicianId) {
-      alert("Please select technician");
-      return;
-    }
+    if (!technicianId) return alert("Please select technician");
 
-    const updateData = {
+    const { data: { session } } = await supabase.auth.getSession();
+    const manager = session.user;
+
+    const report = await db.reports.get(reportId);
+    const oldStatus = report?.status || "Submitted";
+
+    // --------------------------
+    // Build local status change entry
+    // --------------------------
+    const historyEntry = {
+      old_status: oldStatus,
+      new_status: "New",
+      changed_by: manager.id,
+      changed_by_name: manager.email,
+      changed_at: new Date().toISOString()
+    };
+
+    const existingChanges = report._status_changes || [];
+
+    // --------------------------
+    // 1) Update Dexie offline
+    // --------------------------
+    await db.reports.update(reportId, {
       assigned_to: technicianId,
       assigned_at: new Date().toISOString(),
       status: "New",
-      synced: false   // IMPORTANT: mark for sync
-    };
+      updated_at: new Date().toISOString(),
+      updated_by: manager.id,
+      synced: false,
+      _status_changes: [...existingChanges, historyEntry]
+    });
 
-    // ✅ Always update Dexie first (offline-compatible)
-    await db.reports.update(reportId, updateData);
+    console.log("historyEntry:", historyEntry);
 
-    // ✅ If online, update Supabase immediately
+    // --------------------------
+    // 2) Online update if available
+    // --------------------------
     if (navigator.onLine) {
       const { error } = await supabase
         .from("reports")
@@ -93,23 +115,25 @@ export default function AssignReport() {
           assigned_to: technicianId,
           assigned_at: new Date().toISOString(),
           status: "New",
+          updated_at: new Date().toISOString(),
+          updated_by: manager.id
         })
         .eq("id", reportId);
 
       if (error) {
         console.error(error);
-        alert("Saved offline - will sync later");
-        return;
+        alert("Assigned offline — will sync later");
       }
     }
 
-    alert("✅ Assigned Successfully");
+    alert("✔ Assigned Successfully");
 
-    // ✅ Trigger sync in case user just came online
+    // --------------------------
+    // 3) Trigger sync & reload
+    // --------------------------
     syncReports();
-
-    // Refresh UI
     loadData();
+
   }
 
   if (loading) return <p className="p-6">Loading reports…</p>;

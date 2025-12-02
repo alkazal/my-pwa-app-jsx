@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { db } from "../db";
 import { useNavigate } from "react-router-dom";
+import { syncReports } from "../lib/sync";
 
 function statusColor(status) {
   if (status === "Open") return "text-yellow-600";
@@ -35,12 +36,8 @@ export default function TechnicianDashboard() {
 
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
-
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
+    if (!user) return navigate("/login");
+    
     // ---- ONLINE ----
     if (navigator.onLine) {
       const { data, error } = await supabase
@@ -49,9 +46,7 @@ export default function TechnicianDashboard() {
         .eq("assigned_to", user.id)
         .order("assigned_at", { ascending: false });
 
-      if (!error) {
-        setReports(data || []);
-      }
+      if (!error) setReports(data || []);
     } 
     // ---- OFFLINE ----
     else {
@@ -66,6 +61,9 @@ export default function TechnicianDashboard() {
     setLoading(false);
   }
 
+  // --------------------------
+  // UPDATE STATUS (offline-first)
+  // --------------------------
   async function updateStatus(reportId) {
     const newStatus = statusUpdates[reportId];
 
@@ -74,36 +72,71 @@ export default function TechnicianDashboard() {
       return;
     }
 
-    if (newStatus === reports.find(r => r.id === reportId)?.status) {
-      alert("Status is already set to this value");
+    // if (newStatus === reports.find(r => r.id === reportId)?.status) {
+    //   alert("Status is already set to this value");
+    //   return;
+    // }
+
+    // // ✅ Allowed: Open, Pending, Resolved (manager only can close)
+    // if (!["Open", "Pending", "Resolved"].includes(newStatus)) {
+    //   alert("Invalid status");
+    //   return;
+    // }
+
+    const current = reports.find(r => r.id === reportId);
+    if (!current) return;
+
+    if (current.status === newStatus) {
+      alert("Already set to this status");
       return;
     }
 
-    // ✅ Allowed: Open, Pending, Resolved (manager only can close)
-    if (!["Open", "Pending", "Resolved"].includes(newStatus)) {
-      alert("Invalid status");
-      return;
-    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session.user;
+    //const now = new Date().toISOString();
 
-    // ---- OFFLINE FIRST ----
+    // --------------------------
+    // 1) Push local status history
+    // --------------------------
+    const historyEntry = {
+      old_status: current.status,
+      new_status: newStatus,
+      changed_by: user.id,
+      changed_by_name: user.email || user.full_name || user.id,
+      changed_at: new Date().toISOString()
+    };
+
+    const existing = current._status_changes || [];
+
+    // --------------------------
+    // 2) Update Dexie offline
+    // --------------------------
     await db.reports.update(reportId, {
       status: newStatus,
       updated_at: new Date().toISOString(),
-      synced: false
+      updated_by: user.id,
+      synced: false,
+      _status_changes: [...existing, historyEntry]
+      //_status_changes: (await db.reports.get(reportId))._status_changes ? [...(await db.reports.get(reportId))._status_changes, historyEntry] : [historyEntry]
     });
+    // END FOR LOG HISTORY
 
-    // Sync if online
+    
+    // --------------------------
+    // 3) Attempt to update Supabase immediately if online
+    // --------------------------
     if (navigator.onLine) {
       const { error } = await supabase
         .from("reports")
         .update({
           status: newStatus,
+          updated_by: user.id,
           updated_at: new Date().toISOString()
         })
         .eq("id", reportId);
 
       if (error) {
-        console.error(error);
+        console.error("SUPABASE UPDATE ERROR:", error);
         alert("Offline saved — will sync later");
         return;
       }

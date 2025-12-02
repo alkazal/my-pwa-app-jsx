@@ -30,6 +30,11 @@ function getMimeType(att) {
   return "application/octet-stream";
 }
 
+// Helper
+function safeDate(d) {
+  return d || new Date().toISOString();
+}
+
 /* ===============================
    SYNC FUNCTION
 ================================ */
@@ -158,24 +163,69 @@ export async function syncReports() {
         continue;
       }
 
-      try {
-        // UPSERT report
-        const { error } = await supabase
-          .from("reports")
-          .upsert({
-            id: report.id,
-            user_id: user.id,
-            title: report.title,
-            description: report.description,
-            report_type: report.report_type,
-            created_at: report.created_at,
-            updated_at: new Date().toISOString()
-          }, { onConflict: "id" });
+      const reportId = report.id;
 
-        if (error) {
-          console.error("❌ Failed to upsert report:", error);
+      // ----------------------------------------------------------
+      // Build safe payload (NEVER overwrite user_id if exists online)
+      // ----------------------------------------------------------
+      const payload = {
+        id: reportId,
+        title: report.title,
+        description: report.description,
+        report_type: report.report_type,
+        status: report.status,
+        assigned_to: report.assigned_to,
+        assigned_at: report.assigned_at,
+        created_at: safeDate(report.created_at),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Only include user_id if this report was created locally first
+      if (!report._synced_once) {
+        payload.user_id = report.user_id;
+      }
+
+      console.log("⬆️ UPSERT:", payload);
+
+      try {
+        // UPSERT report       
+        const { error: upErr } = await supabase
+          .from("reports")
+          .upsert(payload, { onConflict: "id" });
+
+        if (upErr) {
+          console.error("❌ Upsert error", upErr);
           continue;
         }
+
+
+      // START FOR LOG HISTORY 
+        const localStatusChanges = report._status_changes || [];
+        for (const entry of localStatusChanges) {
+          try {
+            await supabase.from("report_status_history").insert({
+              report_id: reportId,
+              old_status: entry.old_status,
+              new_status: entry.new_status,
+              changed_by: entry.changed_by,
+              changed_at: entry.changed_at
+            });
+          } catch (err) {
+            console.error("Failed to push status history:", err);
+          }
+        }
+
+        // clear local status change buffer
+        if (localStatusChanges.length) {
+          await db.reports.update(reportId, { _status_changes: [] });
+        }
+      // END FOR LOG HISTORY
+
+        // Mark that future syncs should NOT include user_id
+        await db.reports.update(reportId, {
+          synced: true,
+          _synced_once: true,
+        });
 
         /* -----------------------------------------
            SYNC ATTACHMENTS FOR THIS REPORT
@@ -255,15 +305,20 @@ export async function syncReports() {
     if (onlineReports) {
       for (const r of onlineReports) {
         await db.reports.put({
-          id: r.id,
-          user_id: r.user_id,
-          title: r.title,
-          description: r.description,
-          report_type: r.report_type,
-          created_at: r.created_at,
-          updated_at: r.updated_at,
-          synced: true
+          ...r,
+          synced: true,
+          _synced_once: true,
         });
+        // await db.reports.put({
+        //   id: r.id,
+        //   user_id: r.user_id,
+        //   title: r.title,
+        //   description: r.description,
+        //   report_type: r.report_type,
+        //   created_at: r.created_at,
+        //   updated_at: r.updated_at,
+        //   synced: true
+        // });
 
         const { data: atts } = await supabase
           .from("attachments")

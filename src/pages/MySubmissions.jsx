@@ -5,6 +5,13 @@ import { useNavigate } from "react-router-dom";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 import { setSyncStatusListener, setReportSyncedListener } from "../lib/syncEvents";
 
+function statusColor(status) {
+  if (status === "Open") return "text-yellow-600";
+  if (status === "Pending") return "text-orange-600";
+  if (status === "Resolved") return "text-green-600";
+  return "text-gray-600";
+}
+
 export default function MySubmissions() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +24,9 @@ export default function MySubmissions() {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
 
+    const cachedUser = JSON.parse(localStorage.getItem("appUser") || "{}");
+    const userRole = cachedUser.role;
+
     if (!userId) {
       if (navigator.onLine) navigate("/login");
       const offlineData = await db.reports.toArray();
@@ -26,24 +36,66 @@ export default function MySubmissions() {
     }
 
     let onlineData = [];
+    let list = [];
+
     if (navigator.onLine) {
-      const { data, error } = await supabase
-        .from("reports")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-      if (!error) onlineData = data;
+      let query;
+
+      // ⭐ ROLE-BASED FILTER
+      if (userRole === "manager") {
+        query = supabase
+          .from("reports")
+          .select(`
+            *,
+            user_profiles: user_id ( full_name )
+          `)
+          .order("created_at", { ascending: false });
+      } else {
+        query = supabase
+          .from("reports")
+          .select(`
+            *,
+            user_profiles: user_id ( full_name )
+          `)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+      }
+
+      const { data, error } = await query;
+
+      if (!error) {
+        list = data.map(r => ({
+          ...r,
+          submitted_by: r.user_profiles?.full_name || "Unknown"
+        }));
+      }
+    } else {
+
+      // ⭐ OFFLINE FILTER (role-based)
+      let offlineData = [];
+
+      if (userRole === "manager") {
+        offlineData = await db.reports.toArray();
+      } else {
+        offlineData = await db.reports
+          .where("user_id")
+          .equals(userId)
+          .toArray();
+      }
+
+      list = offlineData.map(r => ({
+        ...r,
+        submitted_by: userRole === "manager"
+          ? r.user_profiles?.full_name || "User"
+          : cachedUser.full_name || "You"
+      }));
     }
 
-    const offlineData = await db.reports
-      .where("user_id")
-      .equals(userId)
-      .and(r => r.synced === false)
-      .toArray();
-
-    setItems([...offlineData, ...onlineData]);
+    //setItems([...offlineData, ...onlineData]);    
+    setItems(list);
     setLoading(false);
   };
+
 
   useEffect(() => {
     loadData();
@@ -53,15 +105,6 @@ export default function MySubmissions() {
       if (status === "done") loadData();
     });
 
-    // Listen to individual report syncs for toast
-    // setReportSyncedListener((reportDesc) => {
-    //   setToastMessage(`Report synced: ${reportDesc}`);
-    // });
-
-    // const handleOnline = () => syncReports();
-    // window.addEventListener("online", handleOnline);
-
-    // return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   return (
@@ -92,10 +135,20 @@ export default function MySubmissions() {
               />
             )}            
             <h2 className="text-lg font-semibold">{x.title}</h2>
-            <p className="font-semibold">{x.repor_type}</p>
+            <p className="font-semibold">{x.report_type}</p>
+            <p className="text-sm mt-2">
+              <b>Status:</b>{" "}
+              <span className={`font-semibold ${statusColor(x.status)}`}>
+                {x.status}
+              </span>
+            </p>
+            <p className="text-sm text-gray-500">
+              Submitted by: {x.submitted_by}
+            </p>
             <p className="text-sm text-gray-600">
               {new Date(x.created_at).toLocaleString()}
             </p>
+
             {!x.synced && <p className="text-red-500 text-xs mt-1">Offline</p>}
           </div>
         ))}

@@ -13,6 +13,7 @@ import ReportDetails from "./pages/ReportDetails";
 import EditReport from "./pages/EditReport";
 import AssignReport from "./pages/AssignReport";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
+import CloseReport from "./pages/ManagerCloseReport";
 
 import TestSession from "./TestSession"
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -25,26 +26,9 @@ import Navigation from "./components/Navigation";
 
 export default function App() {
 
-  // ------------------------------
-  // 🔄 AUTO SYNC WHEN ONLINE
-  // ------------------------------
   useEffect(() => {
-  // Run at startup if online
-  // if (navigator.onLine) {
-  //   syncReports();
-  // }
     initAutoSync();
-  // Handle online events ONCE globally
-  // const handleOnline = () => {
-  //   console.log("App.jsx ONLINE event → syncing once");
-  //   syncReports();
-  // };
-
-  //window.addEventListener("online", handleOnline);
-
-  // return () => {
-  //   window.removeEventListener("online", handleOnline);
-  // };
+  
 }, []);
 
 
@@ -100,7 +84,14 @@ export default function App() {
               </PrivateRoute>           
             }
           />
-
+          <Route
+            path="/close-report"
+            element={
+              <PrivateRoute role="manager">
+                <CloseReport/>
+              </PrivateRoute>           
+            }
+          />
           <Route
             path="/technician"
             element={

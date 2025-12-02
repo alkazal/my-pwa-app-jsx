@@ -83,6 +83,12 @@ export default function Navigation() {
             </NavLink>
           )}
 
+          {role === "manager" && (
+            <NavLink to="/close-report" className={linkClass}>
+              Close Reports
+            </NavLink>
+          )}
+
           {role === "technician" && (
             <NavLink to="/technician" className={linkClass}>
               Technician Board
