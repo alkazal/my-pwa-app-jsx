@@ -113,6 +113,10 @@ export default function ManagerCloseReport() {
         console.error("Close error:", error);
         alert("Closed offline — will sync later");
       }
+      if (!error) {
+        // Mark local row synced to avoid duplicate UPSERT later
+        await db.reports.update(report.id, { synced: true });
+      }
     }
 
     alert("✔ Report closed successfully");

@@ -6,11 +6,13 @@ export const db = new Dexie("report_db");
 //   reports: "id, report_type, title, description, synced, to_delete, created_at, user_id",
 //   attachments: "id, report_id, user_id, synced, to_delete"
 // });
-db.version(4).stores({
+db.version(5).stores({
   reports: `
     id,
     user_id,
     assigned_to,
+    reporter_name,
+    technician_name,
     ticket_no,
     report_type,
     title,

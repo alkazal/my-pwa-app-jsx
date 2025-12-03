@@ -39,6 +39,9 @@ export default function ReportDetails() {
       const local = await db.reports.get(id);
       if (local) {
         setReport(local);
+
+        local.history = local._status_changes || [];
+        
         const att = await db.attachments
           .where("report_id")
           .equals(id)
@@ -93,55 +96,50 @@ export default function ReportDetails() {
     return <p className="p-6 text-red-500">Report not found</p>;
 
   // ----------------------------------------------------
-  // TIMELINE PREPARATION
+  // BUILD STATUS TIMELINE (NEW CLEAN VERSION)
   // ----------------------------------------------------
-  const baseTimeline = [];
+  const timeline = [];
 
-  // Submitted
-  if (report.created_at) {
-    baseTimeline.push({
-      label: "Submitted",
-      at: report.created_at,
-      by: report.reporter?.full_name || report.user_id,
-      comment: "Initial submission",
+  // 1) Submitted event
+  // timeline.push({
+  //   label: "Submitted",
+  //   at: report.created_at,
+  //   by: report.reporter?.full_name || "Unknown user",
+  //   comment: "Report submitted"
+  // });
+
+  // 2) Assigned → New
+  // if (report.assigned_at) {
+  //   timeline.push({
+  //     label: "Assigned (New)",
+  //     at: report.assigned_at,
+  //     by: report.technician?.full_name || "Manager",
+  //     comment: "Assigned to technician"
+  //   });
+  // }
+
+  // 3) Status change history from DB
+  (report.history || report._status_changes || []).forEach(h => {
+    timeline.push({
+      label: `${h.old_status} → ${h.new_status}`,
+      at: h.changed_at,
+      by: h.changed_by_name || h.changed_by,
+      comment: h.comment
     });
-  }
+  });
 
-  // Assigned
-  if (report.assigned_at) {
-    baseTimeline.push({
-      label: "Assigned (New)",
-      at: report.assigned_at,
-      by: report.technician?.full_name,
-      comment: "Ticket assigned to technician",
-    });
-  }
+  // 4) Closed (manager only)
+  // if (report.closed_at) {
+  //   timeline.push({
+  //     label: "Closed",
+  //     at: report.closed_at,
+  //     by: report.updated_by_name,
+  //     comment: report.closing_notes
+  //   });
+  // }
 
-  // Closed
-  if (report.closed_at) {
-    baseTimeline.push({
-      label: "Closed",
-      at: report.closed_at,
-      by: report.updated_by_name,
-      comment: report.closing_notes,
-    });
-  }
-
-  // Add detailed `_status_changes`
-  const history = (report.history || []).map((h) => ({
-    label: `${h.old_status} → ${h.new_status}`,
-    at: h.changed_at,
-    by: h.changed_by_name,
-    comment: h.comment,
-  }));
-
-  // Final timeline = base + history sorted by date
-  const fullTimeline = [...baseTimeline, ...history].sort(
-    (a, b) => new Date(a.at) - new Date(b.at)
-  );
-
-  console.log("Report:", report);
-  console.log("FullTimeline:", fullTimeline);
+  // FINAL SORT
+  timeline.sort((a, b) => new Date(a.at) - new Date(b.at));
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -166,11 +164,11 @@ export default function ReportDetails() {
         </p>
         <p>
           <b>Submitted by:</b>{" "}
-          {report.reporter?.full_name || report.user_id}
+          {report.reporter?.full_name || report.reporter_name || report.user_id}
         </p>
         {report.technician && (
           <p>
-            <b>Assigned to:</b> {report.technician.full_name}
+            <b>Assigned to:</b> {report.technician?.full_name || report.technician_name}
           </p>
         )}
       </div>
@@ -224,20 +222,26 @@ export default function ReportDetails() {
       {/* ----------------------------------------------------
           STATUS TIMELINE
       ---------------------------------------------------- */}
-      <h2 className="text-xl font-semibold mt-8 mb-3">
-        Status Timeline
-      </h2>
+      <h2 className="text-xl font-semibold mt-8 mb-3">Status Timeline</h2>
+      <div className="relative border-l-4 border-blue-600 pl-4 space-y-6">
 
-      <div className="border-l-4 border-blue-600 pl-4 space-y-4">
-        {fullTimeline.map((item, i) => (
+        {timeline.map((item, i) => (
           <div key={i} className="relative">
-            <div className="absolute -left-3 top-1 w-3 h-3 bg-blue-600 rounded-full" />
 
+            {/* Dot */}
+            <div className="absolute -left-3 top-1 w-4 h-4 bg-blue-600 rounded-full border-2 border-white"></div>
+
+            {/* Title */}
             <p className="font-semibold">{item.label}</p>
+
+            {/* Timestamp + User */}
             <p className="text-sm text-gray-600">
-              {new Date(item.at).toLocaleString()} — {item.by}
+              {new Date(item.at).toLocaleString()}  
+              {" — "}
+              <span className="font-medium">{item.by}</span>
             </p>
 
+            {/* Comment */}
             {item.comment && (
               <p className="text-gray-700 text-sm mt-1">
                 💬 {item.comment}
@@ -245,7 +249,10 @@ export default function ReportDetails() {
             )}
           </div>
         ))}
+
       </div>
+
+      
     </div>
   );
 }

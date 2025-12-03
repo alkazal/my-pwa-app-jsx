@@ -72,10 +72,10 @@ export default function TechnicianDashboard() {
       return;
     }
 
-    // if (newStatus === reports.find(r => r.id === reportId)?.status) {
-    //   alert("Status is already set to this value");
-    //   return;
-    // }
+    if (newStatus === reports.find(r => r.id === reportId)?.status) {
+       alert("Status is already set to this value");
+        return;
+    }
 
     // // ✅ Allowed: Open, Pending, Resolved (manager only can close)
     // if (!["Open", "Pending", "Resolved"].includes(newStatus)) {
@@ -139,6 +139,10 @@ export default function TechnicianDashboard() {
         console.error("SUPABASE UPDATE ERROR:", error);
         alert("Offline saved — will sync later");
         return;
+      }
+      if (!error) {
+        // Mark local row synced to avoid duplicate UPSERT later
+        await db.reports.update(reportId, { synced: true });
       }
     }
 

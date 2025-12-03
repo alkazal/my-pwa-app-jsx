@@ -200,25 +200,25 @@ export async function syncReports() {
 
 
       // START FOR LOG HISTORY 
-        const localStatusChanges = report._status_changes || [];
-        for (const entry of localStatusChanges) {
-          try {
-            await supabase.from("report_status_history").insert({
-              report_id: reportId,
-              old_status: entry.old_status,
-              new_status: entry.new_status,
-              changed_by: entry.changed_by,
-              changed_at: entry.changed_at
-            });
-          } catch (err) {
-            console.error("Failed to push status history:", err);
-          }
-        }
+        // const localStatusChanges = report._status_changes || [];
+        // for (const entry of localStatusChanges) {
+        //   try {
+        //     await supabase.from("report_status_history").insert({
+        //       report_id: reportId,
+        //       old_status: entry.old_status,
+        //       new_status: entry.new_status,
+        //       changed_by: entry.changed_by,
+        //       changed_at: entry.changed_at
+        //     });
+        //   } catch (err) {
+        //     console.error("Failed to push status history:", err);
+        //   }
+        // }
 
-        // clear local status change buffer
-        if (localStatusChanges.length) {
-          await db.reports.update(reportId, { _status_changes: [] });
-        }
+        // // clear local status change buffer
+        // if (localStatusChanges.length) {
+        //   await db.reports.update(reportId, { _status_changes: [] });
+        // }
       // END FOR LOG HISTORY
 
         // Mark that future syncs should NOT include user_id
@@ -299,27 +299,33 @@ export async function syncReports() {
     ========================================================== */
     const { data: onlineReports } = await supabase
       .from("reports")
-      .select("*")
+      .select(`
+        *,
+        reporter:user_id ( full_name ),
+        technician:assigned_to ( full_name ),
+        history:report_status_history(
+          id,
+          old_status,
+          new_status,
+          changed_at,
+          comment,
+          changed_by,
+          changed_by_name
+        )
+      `)
       .eq("user_id", user.id);
 
     if (onlineReports) {
       for (const r of onlineReports) {
         await db.reports.put({
           ...r,
+          reporter_name: r.reporter?.full_name || null,
+          technician_name: r.technician?.full_name || null,
           synced: true,
           _synced_once: true,
+          _status_changes: r.history || []
         });
-        // await db.reports.put({
-        //   id: r.id,
-        //   user_id: r.user_id,
-        //   title: r.title,
-        //   description: r.description,
-        //   report_type: r.report_type,
-        //   created_at: r.created_at,
-        //   updated_at: r.updated_at,
-        //   synced: true
-        // });
-
+        
         const { data: atts } = await supabase
           .from("attachments")
           .select("*")

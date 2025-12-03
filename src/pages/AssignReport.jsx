@@ -124,6 +124,10 @@ export default function AssignReport() {
         console.error(error);
         alert("Assigned offline — will sync later");
       }
+      if (!error) {
+        // Mark local row synced to avoid duplicate UPSERT later
+        await db.reports.update(reportId, { synced: true });
+      }
     }
 
     alert("✔ Assigned Successfully");
