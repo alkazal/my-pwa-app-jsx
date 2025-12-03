@@ -47,7 +47,8 @@ export default function MySubmissions() {
           .from("reports")
           .select(`
             *,
-            user_profiles: user_id ( full_name )
+            user_profiles: user_id ( full_name ),
+            technician:assigned_to ( full_name )
           `)
           .order("created_at", { ascending: false });
       } else {
@@ -55,7 +56,8 @@ export default function MySubmissions() {
           .from("reports")
           .select(`
             *,
-            user_profiles: user_id ( full_name )
+            user_profiles: user_id ( full_name ),
+            technician:assigned_to ( full_name )
           `)
           .eq("user_id", userId)
           .order("created_at", { ascending: false });
@@ -66,7 +68,8 @@ export default function MySubmissions() {
       if (!error) {
         list = data.map(r => ({
           ...r,
-          submitted_by: r.user_profiles?.full_name || "Unknown"
+          submitted_by: r.user_profiles?.full_name || "Unknown",
+          assigned_to: r.technician?.full_name || "Unknown"
         }));
       }
     } else {
@@ -86,8 +89,9 @@ export default function MySubmissions() {
       list = offlineData.map(r => ({
         ...r,
         submitted_by: userRole === "manager"
-          ? r.user_profiles?.full_name || "User"
-          : cachedUser.full_name || "You"
+          ? r.reporter_name || "User"
+          : r.reporter_name || "You",
+        assigned_to: r.technician_name
       }));
     }
 
@@ -136,14 +140,20 @@ export default function MySubmissions() {
             )}            
             <h2 className="text-lg font-semibold">{x.title}</h2>
             <p className="font-semibold">{x.report_type}</p>
+            <p>
+              <b>Ticket No:</b> {x.ticket_no}
+            </p>
             <p className="text-sm mt-2">
               <b>Status:</b>{" "}
               <span className={`font-semibold ${statusColor(x.status)}`}>
                 {x.status}
               </span>
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mt-2">
               Submitted by: {x.submitted_by}
+            </p>
+            <p className="text-sm text-gray-500">
+              Assigned to: {x.assigned_to}
             </p>
             <p className="text-sm text-gray-600">
               {new Date(x.created_at).toLocaleString()}
