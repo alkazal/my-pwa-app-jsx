@@ -4,7 +4,8 @@ import { db } from "../db";
 import { useNavigate } from "react-router-dom";
 //import Toast from "../components/Toast";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
-import {setSyncStatusListener, setReportSyncedListener,clearSyncListeners } from "../lib/syncEvents";
+import { setSyncStatusListener, setReportSyncedListener, clearSyncListeners } from "../lib/syncEvents";
+
 
 import {
   BarChart,
@@ -15,6 +16,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -54,6 +56,9 @@ export default function Home() {
 
     setUser(session.user);
 
+    const cachedUser = JSON.parse(localStorage.getItem("appUser") || "{}");
+    const userRole = cachedUser.role;
+
 
     // const { data } = await supabase
     //   .from("user_profiles")
@@ -65,14 +70,49 @@ export default function Home() {
 
     // Online reports
     let onlineReports = [];
-    if (navigator.onLine) {
-      const { data, error } = await supabase
-        .from("reports")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .order("created_at", { ascending: false });
+    let list = [];
 
-      if (!error) onlineReports = data;
+    if (navigator.onLine) {
+      let query;
+      if (userRole === "manager") {
+        query = supabase
+          .from("reports")
+          .select(`
+            *,
+            user_profiles: user_id ( full_name ),
+            technician:assigned_to ( full_name )
+          `)
+          .order("created_at", { ascending: false });
+      } else {
+        query = supabase
+          .from("reports")
+          .select(`
+            *,
+            user_profiles: user_id ( full_name ),
+            technician:assigned_to ( full_name )
+          `)
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false });
+      }
+
+      const { data, error } = await query;
+
+      if (!error) {
+        list = data.map(r => ({
+          ...r,
+          submitted_by: r.user_profiles?.full_name || "Unknown",
+          assigned_to: r.technician?.full_name || "Unknown"
+        }));
+      }
+      // const { data, error } = await supabase
+      //   .from("reports")
+      //   .select("*")
+      //   .eq("user_id", session.user.id)
+      //   .order("created_at", { ascending: false });
+
+      if (!error) onlineReports = list;
+
+
     }
 
     // Offline reports
@@ -128,6 +168,18 @@ export default function Home() {
       <h1 className="text-2xl font-bold mb-2">
         Welcome, {user?.email ?? "User"}!
       </h1>
+
+      
+      <button
+            onClick={async () => {
+          await subscribeUserToPush();
+          alert("Push notifications enabled!");
+        }}
+        className="bg-blue-600 text-white px-3 py-2 rounded"
+      >
+        Enable Notifications
+      </button>
+
 
       {syncStatus === "syncing" && (
         <p className="text-blue-600 font-medium mb-4">Syncing offline reports...</p>

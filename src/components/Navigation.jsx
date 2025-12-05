@@ -97,6 +97,9 @@ export default function Navigation() {
 
           <NavLink to="/new-report" className={linkClass}>New Report</NavLink>
 
+          
+
+
         </div>
 
         <button
@@ -130,6 +133,7 @@ export default function Navigation() {
             <ArrowRightIcon  className="w-6 h-6" />
             <span className="text-xs">Logout</span>
           </button>
+
         </div>
       </nav>
     </>
