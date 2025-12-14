@@ -63,9 +63,6 @@ export default function App() {
               <ProtectedRoute>
                 <NewReport />
               </ProtectedRoute>
-              // <PrivateRoute>
-              //   <NewReport />
-              // </PrivateRoute>
             }
           />
           <Route

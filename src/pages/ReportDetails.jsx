@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../db";
 import { supabase } from "../lib/supabase";
+import { deleteReport } from "../utils/deleteReport";
 
 // For image modal
 function Modal({ url, onClose }) {
@@ -25,7 +26,10 @@ export default function ReportDetails() {
 
   const [report, setReport] = useState(null);
   const [attachments, setAttachments] = useState([]);
+
   const [modalUrl, setModalUrl] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
+
   const [loading, setLoading] = useState(true);
 
   // ----------------------------------------------------
@@ -90,6 +94,16 @@ export default function ReportDetails() {
 
     load();
   }, [id]);
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === "Escape") {
+        setPreviewFile(null);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   if (loading) return <p className="p-6">Loading...</p>;
   if (!report)
@@ -186,38 +200,196 @@ export default function ReportDetails() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {attachments.map((att) => {
-          const isImg = att.mime_type?.startsWith("image/");
-          const url =
-            att.file_url ||
-            (att.file_data && URL.createObjectURL(att.file_data));
+          const isImage = att.mime_type?.startsWith("image");
+          //const isImg = att.mime_type?.startsWith("image/");
+          // const url =
+          //   att.file_url ||
+          //   (att.file_data && URL.createObjectURL(att.file_data));
+
+          // Fallback URL:
+            // - If online: att.file_url
+            // - If offline: att.file_data or att.file (Blob)
+            let fileUrl = att.file_url;
+
+            if (!fileUrl && (att.file || att.file_data)) {
+              // Convert blob to URL
+              fileUrl = URL.createObjectURL(att.file || att.file_data);
+            }
+
 
           return (
-            <div
-              key={att.id}
-              className="border rounded p-2 bg-white shadow-sm cursor-pointer"
-              onClick={() => isImg && setModalUrl(url)}
-            >
-              {isImg ? (
-                <img
-                  src={url}
-                  className="h-32 w-full object-cover rounded"
-                />
-              ) : (
-                <div className="h-32 bg-gray-200 flex items-center justify-center rounded">
-                  📄
-                </div>
-              )}
+          //   <div
+          //     key={att.id}
+          //     className="border rounded p-2 bg-white shadow-sm cursor-pointer"
+          //     onClick={() => isImg && setModalUrl(url)}
+          //   >
+          //     {isImg ? (
+          //       <img
+          //         src={url}
+          //         className="h-32 w-full object-cover rounded"
+          //       />
+          //     ) : (
+          //       <div className="h-32 bg-gray-200 flex items-center justify-center rounded">
+          //         📄
+          //       </div>
+          //     )}
 
-              <p className="text-xs mt-1 truncate">{att.file_name}</p>
-            </div>
-          );
+          //     <p className="text-xs mt-1 truncate">{att.file_name}</p>
+          //   </div>
+          // );
+            <div
+                key={att.id}
+                className="border rounded-md p-2 shadow-sm bg-white"
+              >
+                {/* Thumbnail Preview */}
+                {isImage ? (
+                  <img
+                      src={fileUrl}
+                      alt={att.file_name}
+                      onClick={() =>
+                        setPreviewFile({
+                          url: fileUrl,
+                          name: att.file_name,
+                          type: att.mime_type,
+                        })
+                      }
+                      className="w-full h-28 object-cover rounded cursor-pointer hover:opacity-80"
+                    />
+                ) : (
+                  <div className="w-full h-28 bg-gray-200 flex items-center justify-center rounded">
+                    <span className="text-gray-600 text-sm">📄 File</span>
+                  </div>
+                )}
+
+                {/* Filename */}
+                <p className="text-xs mt-2 text-gray-700 truncate">
+                  {att.file_name}
+                </p>
+
+                {/* Actions */}
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() =>
+                      setPreviewFile({
+                        url: fileUrl,
+                        name: att.file_name,
+                        type: att.mime_type,
+                      })
+                    }
+                    className="text-blue-600 text-xs underline"
+                  >
+                    View
+                  </button>
+
+                  <a
+                    href={fileUrl}
+                    download={att.file_name}
+                    className="text-blue-600 text-xs underline"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            );
         })}
       </div>
 
+
+       {/* EDIT BUTTON */}
+      <button
+        className="mt-6 w-full bg-blue-600 text-white py-2 rounded"
+        onClick={() => navigate(`/report/${id}/edit`)}
+      >
+        Edit Report
+      </button>
+      <button
+        className="mt-6 w-full bg-red-600 text-white py-2 rounded"
+        onClick={async () => {
+          if (confirm("Delete this report?")) {
+            await deleteReport(report);
+            navigate("/");
+          }
+        }}        
+      >
+        Delete
+      </button>
+
+      {/* Delete Button */}
+      {/* <button
+        onClick={() => deleteReport(id)}
+        className="mt-4 bg-red-600 text-white px-4 py-2 rounded"
+      >
+        Delete Report
+      </button> */}
+
       {/* Image Preview Modal */}
-      {modalUrl && (
+      {/* {modalUrl && (
         <Modal url={modalUrl} onClose={() => setModalUrl(null)} />
+      )} */}
+
+      {/* ===================== PREVIEW MODAL ===================== */}
+      {previewFile && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white w-full max-w-3xl rounded-lg p-4 relative">
+            
+            {/* Close button */}
+            <button
+              onClick={() => setPreviewFile(null)}
+              className="absolute top-2 right-3 text-gray-500 hover:text-black text-lg"
+            >
+              ✕
+            </button>
+
+            {/* File name */}
+            <p className="text-sm mb-3 font-semibold truncate">
+              {previewFile.name}
+            </p>
+
+            {/* Preview content */}
+            {previewFile.type?.startsWith("image") ? (
+              <img
+                src={previewFile.url}
+                className="w-full max-h-[75vh] object-contain rounded"
+              />
+            ) : previewFile.type === "application/pdf" ? (
+              <iframe
+                src={previewFile.url}
+                className="w-full h-[75vh] rounded"
+                title="PDF Preview"
+              />
+            ) : (
+              <div className="flex flex-col items-center p-10">
+                <p className="mb-4">Cannot preview this file type</p>
+                <a
+                  href={previewFile.url}
+                  download
+                  className="bg-blue-600 text-white px-4 py-2 rounded"
+                >
+                  Download
+                </a>
+              </div>
+            )}
+
+            {/* Bottom actions */}
+            <div className="mt-4 flex justify-end gap-3">
+              <a
+                href={previewFile.url}
+                download
+                className="bg-green-600 text-white px-4 py-2 rounded"
+              >
+                Download
+              </a>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="bg-gray-300 px-4 py-2 rounded"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
+
 
       {/* ----------------------------------------------------
           STATUS TIMELINE

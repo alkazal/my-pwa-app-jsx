@@ -95,6 +95,8 @@ export async function syncReports() {
     const reportsToDelete = await db.reports
       .filter(r => r?.to_delete === true)
       .toArray();
+    
+    console.log("Reports to delete:", reportsToDelete.length);
 
     for (const rep of reportsToDelete) {
       try {
