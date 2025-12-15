@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 import { setSyncStatusListener, setReportSyncedListener, clearSyncListeners } from "../lib/syncEvents";
 
-
 import {
   BarChart,
   Bar,
@@ -18,6 +17,31 @@ import {
 } from "recharts";
 
 
+async function testPush() {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert("Not logged in");
+    return;
+  }
+
+  const { data, error } = await supabase.functions.invoke("send-push", {
+    body: {
+      user_id: user.id,
+      title: "Test Push",
+      body: "Hello from Supabase 🚀",
+    },
+  });
+
+  if (error) {
+    console.error("Push error:", error);
+    alert("Push failed – check console");
+  } else {
+    console.log("Push sent:", data);
+    alert("Push sent ✅");
+  }
+}
+
 export default function Home() {
   const [user, setUser] = useState(null);
   const [reports, setReports] = useState([]);
@@ -26,24 +50,6 @@ export default function Home() {
   const [toastMessage, setToastMessage] = useState("");
   const navigate = useNavigate();
 
-  // useEffect(() => {
-  //   async function debugRole() {
-  //     const { data: { session } } = await supabase.auth.getSession();
-
-  //     console.log("SESSION USER:", session?.user?.email, session?.user?.id);
-
-  //     const { data, error } = await supabase
-  //       .from("user_profiles")
-  //       .select("role")
-  //       .eq("id", session.user.id)
-  //       .single();
-
-  //     console.log("ROLE FROM DB:", data, error);
-  //   }
-
-  //   debugRole();
-  // }, []);
-  
   // Load reports
   const loadReports = async () => {
     setLoading(true);
@@ -170,8 +176,7 @@ export default function Home() {
       </h1>
 
       
-      <button
-            onClick={async () => {
+      <button onClick={async () => {
           await subscribeUserToPush();
           alert("Push notifications enabled!");
         }}
@@ -179,6 +184,15 @@ export default function Home() {
       >
         Enable Notifications
       </button>
+
+      <button
+        onClick={testPush}
+        className="mt-4 bg-purple-600 text-white px-4 py-2 rounded"
+      >
+        🔔Test Push Notification
+      </button>
+
+
 
 
       {syncStatus === "syncing" && (
