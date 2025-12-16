@@ -27,7 +27,7 @@ async function testPush() {
 
   const { data, error } = await supabase.functions.invoke("send-push", {
     body: {
-      user_id: "057f00f1-025f-4919-903f-d721c2ca4c6c", // mrizal
+      user_id: user.id,
       title: "Test Push",
       body: "Hello from Supabase 🚀",
     },
@@ -38,7 +38,7 @@ async function testPush() {
     alert("Push failed – check console");
   } else {
     console.log("Push sent:", data);
-    alert("Push sent ✅");
+    alert("Push sent to " + user.id + "✅");
   }
 }
 
