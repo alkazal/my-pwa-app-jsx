@@ -40,13 +40,12 @@ async function testPush() {
     console.log("Push sent:", data);
     alert("Push sent to " + user.id + "✅");
 
-    const { user_id, title, body } = await req.json();
-    console.log("EDGE FUNCTION user_id:", user_id);
+    console.log("EDGE FUNCTION user_id:", user.id);
 
     const { data: subs, error } = await supabase
       .from("push_subscriptions")
       .select("*")
-      .eq("user_id", user_id);
+      .eq("user_id", user.id);
 
     console.log("FOUND SUBSCRIPTIONS:", subs?.length);
 
