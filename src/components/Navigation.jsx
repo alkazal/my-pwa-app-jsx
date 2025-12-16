@@ -125,9 +125,16 @@ export default function Navigation() {
           </NavLink>
 
           {role === "technician" && (
-            <NavLink to="/technician" className={linkClass}>
+            <NavLink to="/technician" className="flex flex-col items-center">
               <ClipboardDocumentListIcon className="w-6 h-6" />
                 <span className="text-xs">Tasks</span>
+            </NavLink>
+          )}
+
+          {role === "manager" && (
+            <NavLink to="/assign" className="flex flex-col items-center">
+              <ClipboardDocumentListIcon className="w-6 h-6" />
+                <span className="text-xs">Assign</span>
             </NavLink>
           )}
 
