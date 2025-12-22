@@ -1,32 +1,37 @@
 self.addEventListener("push", (event) => {
-  let data = {};
-  try {
-    data = event.data.json();
-  } catch (e) {
-    console.warn("Invalid push payload");
+  console.log("[SW] Push event received");
+
+  if (!event.data) {
+    console.warn("[SW] No payload");
+    return;
   }
 
-  const title = data.title || "New Notification";
-  const options = {
-    body: data.body || "",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-72.png",
-    data: { url: data.url || "/" }
-  };
+  const payload = event.data.json();
+  console.log("[SW] Payload:", payload);
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  const notification = payload.notification;
+
+  if (!notification) {
+    console.warn("[SW] No notification object");
+    return;
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(notification.title, {
+      body: notification.body,
+      icon: notification.icon || "/icons/icon-192.png",
+      badge: notification.badge || "/icons/badge.png",
+      data: payload.data || {},
+    })
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data.url;
 
+  const url = event.notification.data?.url || "/";
   event.waitUntil(
-    clients.matchAll({ type: "window" }).then((cl) => {
-      for (const c of cl) {
-        if (c.url.includes(url) && "focus" in c) return c.focus();
-      }
-      return clients.openWindow(url);
-    })
+    clients.openWindow(url)
   );
 });
+
