@@ -22,7 +22,8 @@ export async function subscribeUserToPush() {
     user_id: user.id,
     endpoint,
     p256dh: keys.p256dh,
-    auth: keys.auth
+    auth: keys.auth,
+    subscription: subscription.toJSON()
   });
 
   return subscription;
