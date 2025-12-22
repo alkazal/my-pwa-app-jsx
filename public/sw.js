@@ -1,5 +1,5 @@
 self.addEventListener("push", (event) => {
-  console.log("[SW] Push event received");
+  console.log("[SW] Push event received!");
 
   if (!event.data) {
     console.warn("[SW] No payload");
