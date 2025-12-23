@@ -4,15 +4,14 @@ import App from "./App";
 import './index.css';
 import { subscribeUserToPush } from "./lib/pushClient";
 
-//window.subscribeUserToPush = subscribeUserToPush;   
+window.subscribeUserToPush = subscribeUserToPush;   
 // import { registerSW } from 'virtual:pwa-register';
 // registerSW({ immediate: true })
 
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").then(() => {
-      console.log("SW registered");
-    });
+  window.addEventListener("load", async () => {
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    console.log("SW registered:", reg.scope);
   });
 }
 
