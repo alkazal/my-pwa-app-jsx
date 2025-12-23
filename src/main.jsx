@@ -4,7 +4,7 @@ import App from "./App";
 import './index.css';
 import { subscribeUserToPush } from "./lib/pushClient";
 
-window.subscribeUserToPush = subscribeUserToPush;   
+//window.subscribeUserToPush = subscribeUserToPush;   
 // import { registerSW } from 'virtual:pwa-register';
 // registerSW({ immediate: true })
 
