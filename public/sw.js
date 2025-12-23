@@ -1,3 +1,5 @@
+console.log("[SW] Registring...");
+
 self.addEventListener("push", (event) => {
   console.log("[SW] Push event received!");
 
