@@ -1,4 +1,4 @@
-console.log("[SW] Registring...");
+console.log("[SW] Get ready..");
 
 self.addEventListener("push", (event) => {
   console.log("[SW] Push event received!");
@@ -21,8 +21,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(notification.title, {
       body: notification.body,
-      icon: notification.icon || "/icons/icon-192.png",
-      badge: notification.badge || "/icons/badge.png",
+      icon: notification.icon || "/pwa-192x192.png",
+      badge: notification.badge || "/pwa-192x192.png",
       data: payload.data || {},
     })
   );

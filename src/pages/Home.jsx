@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 //import Toast from "../components/Toast";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 import { setSyncStatusListener, setReportSyncedListener, clearSyncListeners } from "../lib/syncEvents";
+import { registerFCM } from "../lib/firebase";
 
 import {
   BarChart,
@@ -50,6 +51,27 @@ async function testPush() {
     console.log("FOUND SUBSCRIPTIONS:", subs?.length);
 
   }
+}
+
+async function enablePush() {
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert("Not logged in");
+    return;
+  }
+
+  const token = await registerFCM();
+  if (!token) return;
+
+  console.log("FCM Token:", token);
+
+  await supabase.from("push_subscriptions").upsert({
+    user_id: user.id,
+    fcm_token: token,
+    platform: "web",
+  });
 }
 
 export default function Home() {
@@ -187,7 +209,8 @@ export default function Home() {
 
       
       <button onClick={async () => {
-          await subscribeUserToPush();
+          //await subscribeUserToPush();
+          await enablePush();
           alert("Push notifications enabled!");
         }}
         className="bg-blue-600 text-white px-3 py-2 rounded"
