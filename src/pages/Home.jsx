@@ -73,6 +73,9 @@ async function enablePush() {
     fcm_token: token,
     platform: "web",
   });
+
+  console.log("push insert data:", data);
+  console.log("push insert error:", error);
   
 }
 
