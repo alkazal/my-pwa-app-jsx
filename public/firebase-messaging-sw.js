@@ -11,6 +11,10 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+self.addEventListener("push", (event) => {
+  console.log("[SW] Raw push event:", event);
+});
+
 messaging.onBackgroundMessage(payload => {
   console.log("[FCM] Background message:", payload);
 
