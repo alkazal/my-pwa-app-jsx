@@ -74,9 +74,6 @@ async function enablePush() {
     platform: "web",
   });
 
-  console.log("push insert data:", data);
-  console.log("push insert error:", error);
-  
 }
 
 export default function Home() {
