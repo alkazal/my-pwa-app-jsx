@@ -65,6 +65,7 @@ async function enablePush() {
   const token = await registerFCM();
   if (!token) return;
 
+  console.log("USER ID:", user.id); 
   console.log("FCM Token:", token);
 
   await supabase.from("push_subscriptions").upsert({
@@ -72,6 +73,7 @@ async function enablePush() {
     fcm_token: token,
     platform: "web",
   });
+  
 }
 
 export default function Home() {
