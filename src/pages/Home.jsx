@@ -5,9 +5,9 @@ import { useNavigate } from "react-router-dom";
 //import Toast from "../components/Toast";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 import { setSyncStatusListener, setReportSyncedListener, clearSyncListeners } from "../lib/syncEvents";
-import { registerFCM } from "../lib/firebase";
+import { enablePushNotifications } from "../lib/push";
 
-import {
+import {  
   BarChart,
   Bar,
   XAxis,
@@ -19,16 +19,16 @@ import {
 
 
 async function testPush() {
-  const { data: { user } } = await supabase.auth.getUser();
+  // const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    alert("Not logged in");
-    return;
-  }
+  // if (!user) {
+  //   alert("Not logged in");
+  //   return;
+  // }
 
   const { data, error } = await supabase.functions.invoke("send-push", {
     body: {
-      user_id: user.id,
+      user_id: session.user.id,//user.id,
       title: "Test Push",
       body: "Hello from Supabase 🚀",
     },
@@ -53,27 +53,14 @@ async function testPush() {
   }
 }
 
-async function enablePush() {
-
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    alert("Not logged in");
-    return;
+async function handleEnablePush() {
+  try {
+    await enablePushNotifications();
+    alert("Push notifications enabled ✅");
+  } catch (err) {
+    console.error(err);
+    alert(err.message);
   }
-
-  const token = await registerFCM();
-  if (!token) return;
-
-  console.log("USER ID:", user.id); 
-  console.log("FCM Token:", token);
-
-  await supabase.from("push_subscriptions").upsert({
-    user_id: user.id,
-    fcm_token: token,
-    platform: "web",
-  });
-
 }
 
 export default function Home() {
@@ -210,15 +197,9 @@ export default function Home() {
       </h1>
 
       
-      <button onClick={async () => {
-          //await subscribeUserToPush();
-          await enablePush();
-          alert("Push notifications enabled!");
-        }}
-        className="bg-blue-600 text-white px-3 py-2 rounded"
-      >
-        Enable Notifications
-      </button>
+      <button onClick={handleEnablePush}>
+  Enable Notifications
+</button>
 
       <button
         onClick={testPush}
