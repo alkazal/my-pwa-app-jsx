@@ -25,6 +25,11 @@ async function testPush() {
   //   alert("Not logged in");
   //   return;
   // }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) throw new Error("Not logged in");
 
   const { data, error } = await supabase.functions.invoke("send-push", {
     body: {
@@ -39,16 +44,7 @@ async function testPush() {
     alert("Push failed – check console");
   } else {
     console.log("Push sent:", data);
-    alert("Push sent to " + user.id + "✅");
-
-    console.log("EDGE FUNCTION user_id:", user.id);
-
-    const { data: subs, error } = await supabase
-      .from("push_subscriptions")
-      .select("*")
-      .eq("user_id", user.id);
-
-    console.log("FOUND SUBSCRIPTIONS:", subs?.length);
+    alert("Push sent to " + session.user.id + "✅");
 
   }
 }
