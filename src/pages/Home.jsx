@@ -25,6 +25,29 @@ export default function Home() {
   const [toastMessage, setToastMessage] = useState("");
   const navigate = useNavigate();
 
+
+  const subscribeToPush = async () => {
+    const registration = await navigator.serviceWorker.ready;
+    
+    // 1. Request Permission
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    // 2. Subscribe to Push Service
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC)
+    });
+
+    // 3. Save to Supabase
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert({ 
+        user_id: session.user.id,
+        subscription: subscription.toJSON() 
+      });
+  };
+
   // Load reports
   const loadReports = async () => {
     setLoading(true);
@@ -151,7 +174,12 @@ export default function Home() {
       </h1>
 
       
-
+      <div className="p-4 border rounded">
+        <h3>Subscribe to Push Notification</h3>
+        <button onClick={subscribeToPush}>
+          Subscribe to Push Notification
+        </button>
+      </div>
 
 
 
