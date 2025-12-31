@@ -43,7 +43,7 @@ export default function Home() {
     const { error } = await supabase
       .from('push_subscriptions')
       .upsert({ 
-        user_id: session.user.id,
+        user_id: user.id,
         subscription: subscription.toJSON() 
       });
   };
@@ -175,7 +175,6 @@ export default function Home() {
 
       
       <div className="p-4 border rounded">
-        <h3>Subscribe to Push Notification</h3>
         <button onClick={subscribeToPush}>
           Subscribe to Push Notification
         </button>
