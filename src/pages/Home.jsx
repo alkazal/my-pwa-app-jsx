@@ -48,6 +48,28 @@ export default function Home() {
       });
   };
 
+  const sendTestNotification = async () => {
+    // 1. Get the current user's ID
+    // const { data: { user } } = await supabase.auth.getUser();
+
+    // if (!user) {
+    //   console.error("You must be logged in to test this.");
+    //   return;
+    // }
+
+    // 2. Invoke the Edge Function
+    const { data, error } = await supabase.functions.invoke('send-push', {
+      body: { 
+        userId: user.id, 
+        title: "Hello from Supabase!", 
+        body: "This is a test push notification." 
+      },
+    });
+
+    if (error) console.error('Error invoking function:', error);
+    else console.log('Function response:', data);
+  };
+
   // Load reports
   const loadReports = async () => {
     setLoading(true);
@@ -180,7 +202,12 @@ export default function Home() {
         </button>
       </div>
 
-
+      <div className="p-4 border rounded">
+        <h3>Push Notification Test</h3>
+        <button onClick={sendTestNotification}>
+          Send Me a Notification
+        </button>
+      </div>
 
 
 
