@@ -36,7 +36,7 @@ export default function Home() {
     // 2. Subscribe to Push Service
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC)
+      applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC
     });
 
     // 3. Save to Supabase
