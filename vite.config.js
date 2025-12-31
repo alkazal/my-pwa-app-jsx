@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate', // Updates app automatically when new version deployed
       workbox: {
         // --- ADD OR UPDATE THIS SECTION ---

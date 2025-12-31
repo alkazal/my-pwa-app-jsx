@@ -4,8 +4,7 @@ export async function registerServiceWorkers() {
   // 1️⃣ Register PWA SW
   await navigator.serviceWorker.register("/sw.js");
 
-  // 2️⃣ Register Firebase Messaging SW
-  await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+
 
   console.log("Service Workers registered");
 }

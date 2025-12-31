@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 //import Toast from "../components/Toast";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 import { setSyncStatusListener, setReportSyncedListener, clearSyncListeners } from "../lib/syncEvents";
-import { enablePushNotifications } from "../lib/push";
+
 
 import {  
   BarChart,
@@ -16,48 +16,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-
-
-async function testPush() {
-  // const { data: { user } } = await supabase.auth.getUser();
-
-  // if (!user) {
-  //   alert("Not logged in");
-  //   return;
-  // }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) throw new Error("Not logged in");
-
-  const { data, error } = await supabase.functions.invoke("send-push", {
-    body: {
-      user_id: session.user.id,//user.id,
-      title: "Test Push",
-      body: "Hello from Supabase 🚀",
-    },
-  });
-
-  if (error) {
-    console.error("Push error:", error);
-    alert("Push failed – check console");
-  } else {
-    console.log("Push sent:", data);
-    alert("Push sent to " + session.user.id + "✅");
-
-  }
-}
-
-async function handleEnablePush() {
-  try {
-    await enablePushNotifications();
-    alert("Push notifications enabled ✅");
-  } catch (err) {
-    console.error(err);
-    alert(err.message);
-  }
-}
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -193,16 +151,9 @@ export default function Home() {
       </h1>
 
       
-      <button onClick={handleEnablePush}>
-  Enable Notifications
-</button>
 
-      <button
-        onClick={testPush}
-        className="mt-4 bg-purple-600 text-white px-4 py-2 rounded"
-      >
-        🔔Test Push Notification
-      </button>
+
+
 
 
 
