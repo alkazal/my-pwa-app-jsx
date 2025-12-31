@@ -21,7 +21,8 @@ import PrivateRoute from "./components/PrivateRoute";
 
 import SyncStatus from "./components/SyncStatus";
 import { initAutoSync } from "./lib/syncAuto";
-
+import { supabase } from "./lib/supabase";
+import { urlBase64ToUint8Array } from "./lib/utils";
 import Navigation from "./components/Navigation";
 
 export default function App() {
@@ -36,7 +37,7 @@ export default function App() {
     // 2. Subscribe to Push Service
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: VITE_VAPID_PUBLIC
+      applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC)
     });
 
     const { data: { user } } = await supabase.auth.getUser();
