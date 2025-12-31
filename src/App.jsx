@@ -27,34 +27,8 @@ import Navigation from "./components/Navigation";
 
 export default function App() {
 
-  const subscribeToPush = async () => {
-    const registration = await navigator.serviceWorker.ready;
-    
-    // 1. Request Permission
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
-
-    // 2. Subscribe to Push Service
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC)
-    });
-
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // 3. Save to Supabase
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .upsert({ 
-        id: user.id,
-        subscription: subscription.toJSON() 
-      });
-  };
-
   useEffect(() => {
     initAutoSync();
-    subscribeToPush();
-  
 }, []);
 
 
