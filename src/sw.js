@@ -5,13 +5,13 @@ import { precacheAndRoute } from 'workbox-precaching';
 precacheAndRoute(self.__WB_MANIFEST);
 
 // src/sw.js
-self.addEventListener('install', () => {
-  self.skipWaiting(); // Forces the waiting Service Worker to become the active one
-});
+// self.addEventListener('install', () => {
+//   self.skipWaiting(); // Forces the waiting Service Worker to become the active one
+// });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim()); // Takes control of all open tabs immediately
-});
+// self.addEventListener('activate', (event) => {
+//   event.waitUntil(clients.claim()); // Takes control of all open tabs immediately
+// });
 
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push Received.');
