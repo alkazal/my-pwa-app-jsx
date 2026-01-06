@@ -6,10 +6,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // strategies: 'injectManifest',
-      // srcDir: 'src',
-      // filename: 'sw.js',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate', // Updates app automatically when new version deployed
+      injectManifest: {
+        swDest: 'dist/sw.js',       // Where it ends up after build
+      },
       workbox: {
         // --- ADD OR UPDATE THIS SECTION ---
         globPatterns: [
