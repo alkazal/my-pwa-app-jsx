@@ -64,7 +64,7 @@ export default function Home() {
       body: { 
         userId: user.id, //"64ee8d0e-184c-4bf3-81bf-c6e13a089802",
         title: "Hello from Supabase!", 
-        body: "This is a test push notification." 
+        body: "This is a test push notification for user " + user.id + "  ." 
       },
     });
 
