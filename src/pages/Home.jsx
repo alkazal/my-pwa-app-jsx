@@ -40,6 +40,19 @@ export default function Home() {
     });
 
     // 3. Save to Supabase
+    const { data: existingData } = await supabase
+      .from('push_subscriptions')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingData) {
+      await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', user.id);
+    }
+
     const { error } = await supabase
       .from('push_subscriptions')
       .upsert({ 
