@@ -196,7 +196,15 @@ export async function syncReports() {
           .upsert(payload, { onConflict: "id" });
 
         if (upErr) {
-          console.error("❌ Upsert error", upErr);
+          if (upErr.code === '3F000') {
+            console.error(
+              "🚨 ACTION REQUIRED: The 'pg_net' extension is missing in Supabase.\n" +
+              "👉 Go to Supabase Dashboard > Database > Extensions, search for 'pg_net' and Enable it."
+            );
+            alert("Database Error: 'pg_net' extension missing. Check console for details.");
+          } else {
+            console.error("❌ Upsert error", upErr);
+          }
           continue;
         }
 
