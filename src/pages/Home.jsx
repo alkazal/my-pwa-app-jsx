@@ -75,9 +75,10 @@ export default function Home() {
     // 2. Invoke the Edge Function
     const { data, error } = await supabase.functions.invoke('send-push', {
       body: { 
-        userId: user.id, //"64ee8d0e-184c-4bf3-81bf-c6e13a089802",
-        title: "Hello from Supabase!", 
-        body: "This is a test push notification for user " + user.id + "  ." 
+        userId: "c2315f42-cf57-426d-8e33-3578aa392e0a",//user.id, //"64ee8d0e-184c-4bf3-81bf-c6e13a089802",
+        title: "Hello BARABBASS from Supabase!", 
+        body: "This is a test push notification for user c2315f42-cf57-426d-8e33-3578aa392e0a ."
+        //body: "This is a test push notification for user " + user.id + "  ." 
       },
     });
 
