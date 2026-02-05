@@ -333,7 +333,8 @@ export async function syncReports() {
           technician_name: r.technician?.full_name || null,
           synced: true,
           _synced_once: true,
-          _status_changes: r.history || []
+           _status_changes: r._status_changes || []
+          //_status_changes: r.history || []
         });
         
         const { data: atts } = await supabase
