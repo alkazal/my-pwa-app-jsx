@@ -141,8 +141,25 @@ export default function TechnicianDashboard() {
         return;
       }
       if (!error) {
+        const { error: historyError } = await supabase
+          .from("report_status_history")
+          .insert({
+            report_id: reportId,
+            old_status: historyEntry.old_status,
+            new_status: historyEntry.new_status,
+            changed_by: historyEntry.changed_by,
+            changed_by_name: historyEntry.changed_by_name,
+            changed_at: historyEntry.changed_at
+          });
+
+        if (historyError) {
+          console.error("History insert failed:", historyError);
+        }
         // Mark local row synced to avoid duplicate UPSERT later
-        await db.reports.update(reportId, { synced: true });
+        await db.reports.update(reportId, {
+          synced: true,
+          ...(historyError ? {} : { _status_changes: [] })
+        });
       }
     }
 

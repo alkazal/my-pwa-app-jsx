@@ -114,8 +114,26 @@ export default function ManagerCloseReport() {
         alert("Closed offline — will sync later");
       }
       if (!error) {
+        const { error: historyError } = await supabase
+          .from("report_status_history")
+          .insert({
+            report_id: report.id,
+            old_status: historyEntry.old_status,
+            new_status: historyEntry.new_status,
+            changed_by: historyEntry.changed_by,
+            changed_by_name: historyEntry.changed_by_name,
+            changed_at: historyEntry.changed_at,
+            comment: historyEntry.comment
+          });
+
+        if (historyError) {
+          console.error("History insert failed:", historyError);
+        }
         // Mark local row synced to avoid duplicate UPSERT later
-        await db.reports.update(report.id, { synced: true });
+        await db.reports.update(report.id, {
+          synced: true,
+          ...(historyError ? {} : { _status_changes: [] })
+        });
       }
     }
 

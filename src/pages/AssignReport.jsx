@@ -74,10 +74,27 @@ export default function AssignReport() {
     const { data: { session } } = await supabase.auth.getSession();
     const manager = session.user;
 
-    const report = await db.reports.get(reportId);
+    let report = await db.reports.get(reportId);
     if (!report) {
-      alert("Report not found locally. Please sync and try again.");
-      return;
+      if (!navigator.onLine) {
+        alert("Report not found locally. Please go online and try again.");
+        return;
+      }
+
+      const { data: onlineReport, error: onlineErr } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("id", reportId)
+        .single();
+
+      if (onlineErr || !onlineReport) {
+        console.error(onlineErr);
+        alert("Report not found. Please sync and try again.");
+        return;
+      }
+
+      await db.reports.put({ ...onlineReport, synced: true });
+      report = onlineReport;
     }
     const oldStatus = report.status || "Submitted";
 
@@ -129,8 +146,25 @@ export default function AssignReport() {
         alert("Assigned offline — will sync later");
       }
       if (!error) {
+        const { error: historyError } = await supabase
+          .from("report_status_history")
+          .insert({
+            report_id: reportId,
+            old_status: historyEntry.old_status,
+            new_status: historyEntry.new_status,
+            changed_by: historyEntry.changed_by,
+            changed_by_name: historyEntry.changed_by_name,
+            changed_at: historyEntry.changed_at
+          });
+
+        if (historyError) {
+          console.error("History insert failed:", historyError);
+        }
         // Mark local row synced to avoid duplicate UPSERT later
-        await db.reports.update(reportId, { synced: true });
+        await db.reports.update(reportId, {
+          synced: true,
+          ...(historyError ? {} : { _status_changes: [] })
+        });
       }
     }
 

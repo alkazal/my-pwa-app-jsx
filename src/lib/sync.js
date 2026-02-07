@@ -210,25 +210,27 @@ export async function syncReports() {
 
 
       // START FOR LOG HISTORY 
-        // const localStatusChanges = report._status_changes || [];
-        // for (const entry of localStatusChanges) {
-        //   try {
-        //     await supabase.from("report_status_history").insert({
-        //       report_id: reportId,
-        //       old_status: entry.old_status,
-        //       new_status: entry.new_status,
-        //       changed_by: entry.changed_by,
-        //       changed_at: entry.changed_at
-        //     });
-        //   } catch (err) {
-        //     console.error("Failed to push status history:", err);
-        //   }
-        // }
+        const localStatusChanges = report._status_changes || [];
+        for (const entry of localStatusChanges) {
+          try {
+            await supabase.from("report_status_history").insert({
+              report_id: reportId,
+              old_status: entry.old_status,
+              new_status: entry.new_status,
+              changed_by: entry.changed_by,
+              changed_by_name: entry.changed_by_name,
+              changed_at: entry.changed_at,
+              comment: entry.comment
+            });
+          } catch (err) {
+            console.error("Failed to push status history:", err);
+          }
+        }
 
-        // // clear local status change buffer
-        // if (localStatusChanges.length) {
-        //   await db.reports.update(reportId, { _status_changes: [] });
-        // }
+        // clear local status change buffer
+        if (localStatusChanges.length) {
+          await db.reports.update(reportId, { _status_changes: [] });
+        }
       // END FOR LOG HISTORY
 
         // Mark that future syncs should NOT include user_id
