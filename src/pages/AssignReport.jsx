@@ -75,7 +75,11 @@ export default function AssignReport() {
     const manager = session.user;
 
     const report = await db.reports.get(reportId);
-    const oldStatus = report?.status || "Submitted";
+    if (!report) {
+      alert("Report not found locally. Please sync and try again.");
+      return;
+    }
+    const oldStatus = report.status || "Submitted";
 
     // --------------------------
     // Build local status change entry
