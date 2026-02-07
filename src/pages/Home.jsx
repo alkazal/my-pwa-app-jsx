@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 //import Toast from "../components/Toast";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 import { setSyncStatusListener, setReportSyncedListener, clearSyncListeners } from "../lib/syncEvents";
+import { startNotificationListener } from "../lib/notificationListener";
 
 
 import {  
@@ -75,7 +76,7 @@ export default function Home() {
     // 2. Invoke the Edge Function
     const { data, error } = await supabase.functions.invoke('send-push', {
       body: { 
-        userId: "c2315f42-cf57-426d-8e33-3578aa392e0a",//user.id, //"64ee8d0e-184c-4bf3-81bf-c6e13a089802",
+        userId: "c2315f42-cf57-426d-8e33-3578aa392e0a",//user.id,
         title: "Hello BARABBASS from Supabase!", 
         body: "This is a test push notification for user c2315f42-cf57-426d-8e33-3578aa392e0a ."
         //body: "This is a test push notification for user " + user.id + "  ." 
@@ -176,6 +177,12 @@ export default function Home() {
     setSyncStatusListener((status) => {
       setSyncStatus(status);
       if (status === "done") loadReports();
+    });
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        startNotificationListener(data.session.user.id);
+      }
     });
 
     // Listen to individual report syncs for toast
