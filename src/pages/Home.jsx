@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 //import Toast from "../components/Toast";
 //import { syncReports, setSyncStatusListener, setReportSyncedListener } from "../lib/sync";
 import { setSyncStatusListener, setReportSyncedListener, clearSyncListeners } from "../lib/syncEvents";
-import { startNotificationListener } from "../lib/notificationListener";
+//import { startNotificationListener } from "../lib/notificationListener";
 
 
 import {  
@@ -179,11 +179,11 @@ export default function Home() {
       if (status === "done") loadReports();
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        startNotificationListener(data.session.user.id);
-      }
-    });
+    // supabase.auth.getSession().then(({ data }) => {
+    //   if (data.session) {
+    //     startNotificationListener(data.session.user.id);
+    //   }
+    // });
 
     // Listen to individual report syncs for toast
     // setReportSyncedListener((reportDesc) => {
