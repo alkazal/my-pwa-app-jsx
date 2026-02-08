@@ -25,11 +25,11 @@ import { supabase } from "./lib/supabase";
 import { urlBase64ToUint8Array } from "./lib/utils";
 import Navigation from "./components/Navigation";
 
-//import { usePushWorker } from "./lib/usePushWorker";
+import { usePushWorker } from "./lib/usePushWorker";
 
 export default function App() {
 
-  //usePushWorker();
+  usePushWorker();
 
   useEffect(() => {
     initAutoSync();
