@@ -87,6 +87,16 @@ export default function Home() {
     else console.log('Function response:', data);
   };
 
+  async function wakePushWorker() {
+    await fetch("https://yzylysefvtnmyrkidzfk.supabase.co/functions/v1/send-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+
+    console.log("worker booted");
+  }
+
   // Load reports
   const loadReports = async () => {
     setLoading(true);
@@ -232,6 +242,12 @@ export default function Home() {
         </button>
       </div>
 
+      <div className="p-4 border rounded">
+        <h3>Wake Push Worker Test</h3>
+        <button onClick={wakePushWorker}>
+          Wake Up Worker
+        </button>
+      </div>
 
 
 
