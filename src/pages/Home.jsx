@@ -207,15 +207,10 @@ export default function Home() {
         <button onClick={subscribeToPush} className="bg-gray-600 hover:bg-gray-700 text-white py-1 px-3 rounded mt-2">
           Subscribe to Push Notification
         </button>
-      </div>
-
-      <div className="p-4 border rounded">
-        <h3>Wake Push Worker Test</h3>
         <button onClick={wakePushWorker} className="bg-gray-600 hover:bg-gray-700 text-white py-1 px-3 rounded mt-2">
           Wake Up Worker
         </button>
       </div>
-
 
 
       {syncStatus === "syncing" && (
