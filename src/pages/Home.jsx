@@ -62,30 +62,22 @@ export default function Home() {
       });
   };
 
-  const sendTestNotification = async () => {
-    // 1. Get the current user's ID
-    // const { data: { user } } = await supabase.auth.getUser();
+  // const sendTestNotification = async () => {
 
-    // if (!user) {
-    //   console.error("You must be logged in to test this.");
-    //   return;
-    // }
+  //   console.log("user.id:", user.id);
 
-    console.log("user.id:", user.id);
+  //   const { data, error } = await supabase.functions.invoke('send-push', {
+  //     body: { 
+  //       userId: "c2315f42-cf57-426d-8e33-3578aa392e0a",//user.id,
+  //       title: "Hello BARABBASS from Supabase!", 
+  //       body: "This is a test push notification for user c2315f42-cf57-426d-8e33-3578aa392e0a ."
+  //       //body: "This is a test push notification for user " + user.id + "  ." 
+  //     },
+  //   });
 
-    // 2. Invoke the Edge Function
-    const { data, error } = await supabase.functions.invoke('send-push', {
-      body: { 
-        userId: "c2315f42-cf57-426d-8e33-3578aa392e0a",//user.id,
-        title: "Hello BARABBASS from Supabase!", 
-        body: "This is a test push notification for user c2315f42-cf57-426d-8e33-3578aa392e0a ."
-        //body: "This is a test push notification for user " + user.id + "  ." 
-      },
-    });
-
-    if (error) console.error('Error invoking function:', error);
-    else console.log('Function response:', data);
-  };
+  //   if (error) console.error('Error invoking function:', error);
+  //   else console.log('Function response:', data);
+  // };
 
   async function wakePushWorker() {
     await fetch("https://yzylysefvtnmyrkidzfk.supabase.co/functions/v1/send-push", {
@@ -189,24 +181,6 @@ export default function Home() {
       if (status === "done") loadReports();
     });
 
-    // supabase.auth.getSession().then(({ data }) => {
-    //   if (data.session) {
-    //     startNotificationListener(data.session.user.id);
-    //   }
-    // });
-
-    // Listen to individual report syncs for toast
-    // setReportSyncedListener((reportDesc) => {
-    //   setToastMessage(`Report synced: ${title}`);
-    // });
-
-    // Auto-sync when back online
-    // const handleOnline = () => syncReports();
-    // window.addEventListener("online", handleOnline);
-
-    // return () => {
-    //   window.removeEventListener("online", handleOnline);
-    // };
     return () => clearSyncListeners();
 
   }, []);
@@ -230,21 +204,14 @@ export default function Home() {
 
       
       <div className="p-4 border rounded">
-        <button onClick={subscribeToPush}>
+        <button onClick={subscribeToPush} className="bg-gray-600 hover:bg-gray-700 text-white py-1 px-3 rounded mt-2">
           Subscribe to Push Notification
         </button>
       </div>
 
       <div className="p-4 border rounded">
-        <h3>Push Notification Test</h3>
-        <button onClick={sendTestNotification}>
-          Send Me a Notification
-        </button>
-      </div>
-
-      <div className="p-4 border rounded">
         <h3>Wake Push Worker Test</h3>
-        <button onClick={wakePushWorker}>
+        <button onClick={wakePushWorker} className="bg-gray-600 hover:bg-gray-700 text-white py-1 px-3 rounded mt-2">
           Wake Up Worker
         </button>
       </div>
